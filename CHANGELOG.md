@@ -7,6 +7,7 @@
 - Added permission mismatch reporting for routes, local state writes, and file reads/writes.
 - Hardened route handler names, SQLite identifier quoting, and formatter string escaping.
 - Added `scripts/release_check.py` for repeatable release smoke checks.
+- Added wheel install smoke checks for release candidates.
 - Added the Customer Brief Generator gallery example.
 - Documented v0.6 release hardening behavior.
 

@@ -17,3 +17,11 @@ def test_release_check_dry_run_includes_gallery_and_core_checks() -> None:
     assert any("examples/gallery/customer-brief-generator/app.sl" in command for command in commands)
     assert any("symboliclight.cli doctor" in command for command in commands)
     assert not any(command.endswith(" -m build") for command in commands)
+    assert not any("scripts/package_smoke.py" in command for command in commands)
+
+
+def test_release_check_includes_package_smoke_when_not_skipped() -> None:
+    commands = [" ".join(command) for command in release_commands(skip_package=False)]
+
+    assert any(command.endswith(" -m build") for command in commands)
+    assert any("scripts/package_smoke.py" in command for command in commands)

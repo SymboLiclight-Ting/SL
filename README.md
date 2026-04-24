@@ -175,6 +175,8 @@ slc add route GET /items <file.sl>
 
 ```bash
 python scripts/release_check.py --skip-package
+python -m build
+python scripts/package_smoke.py
 ```
 
 ## Project Status

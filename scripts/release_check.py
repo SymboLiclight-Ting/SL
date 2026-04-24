@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import os
 import subprocess
 import sys
@@ -16,7 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-package", action="store_true")
     args = parser.parse_args(argv)
-    commands = release_commands(skip_package=args.skip_package or importlib.util.find_spec("build") is None)
+    commands = release_commands(skip_package=args.skip_package)
     for command in commands:
         print("$ " + " ".join(command), flush=True)
         if args.dry_run:
@@ -59,6 +58,7 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
         )
     if not skip_package:
         commands.append([python, "-m", "build"])
+        commands.append([python, "scripts/package_smoke.py"])
     return commands
 
 

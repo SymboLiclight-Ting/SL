@@ -14,3 +14,6 @@
 - Confirm README quick start matches actual CLI behavior.
 - Confirm `slc lsp --help` is available.
 - Run `python scripts/release_check.py --skip-package`.
+- Run `python -m build`.
+- Run `python scripts/package_smoke.py`.
+- Run `python scripts/release_check.py` for the full package-inclusive release gate.
