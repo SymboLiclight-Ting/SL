@@ -179,3 +179,143 @@ app Bad {
     diagnostics = check_program(app, source_path=Path("bad.sl"))
 
     assert any("id expected `Int`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_named_args_for_non_filter_store_methods() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command load() -> Option<Todo> {
+    return todos.get(id: 1)
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("does not accept named arguments" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_duplicate_import_alias(tmp_path: Path) -> None:
+    (tmp_path / "models.sl").write_text("module models { fn ok() -> Bool { return true } }", encoding="utf-8")
+    source = """
+app Bad {
+  import "./models.sl" as models
+  import "./models.sl" as models
+}
+"""
+    path = tmp_path / "bad.sl"
+    path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(path))
+    diagnostics = check_program(app, source_path=path)
+
+    assert any("Duplicate import alias `models`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_import_alias_collision(tmp_path: Path) -> None:
+    (tmp_path / "models.sl").write_text("module models { fn ok() -> Bool { return true } }", encoding="utf-8")
+    source = """
+app Bad {
+  import "./models.sl" as Item
+
+  type Item = {
+    id: Id<Item>,
+  }
+}
+"""
+    path = tmp_path / "bad.sl"
+    path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(path))
+    diagnostics = check_program(app, source_path=path)
+
+    assert any("conflicts with a local declaration" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_supports_function_named_arguments() -> None:
+    source = """
+app Good {
+  fn join(left: Text, right: Text) -> Text {
+    return left
+  }
+
+  test "named args" {
+    assert join(right: "b", left: "a") == "a"
+  }
+}
+"""
+    app = parse_source(source, path="good.sl")
+    diagnostics = check_program(app, source_path=Path("good.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_bad_named_arguments() -> None:
+    source = """
+app Bad {
+  fn join(left: Text, right: Text) -> Text {
+    return left
+  }
+
+  test "bad named args" {
+    assert join(left: "a", left: "b", extra: "c") == "a"
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("provided more than once" in diagnostic.message for diagnostic in diagnostics)
+    assert any("has no parameter `extra`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_duplicate_record_field() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command add(title: Text) -> Todo {
+    return todos.insert({ title: title, title: "again" })
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("provided more than once" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_accepts_option_and_result_constructors() -> None:
+    source = """
+app Good {
+  fn maybe(flag: Bool) -> Option<Text> {
+    if flag {
+      return some("yes")
+    } else {
+      return none()
+    }
+  }
+
+  fn result(flag: Bool) -> Result<Text, Text> {
+    if flag {
+      return ok("yes")
+    } else {
+      return err("no")
+    }
+  }
+}
+"""
+    app = parse_source(source, path="good.sl")
+    diagnostics = check_program(app, source_path=Path("good.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]

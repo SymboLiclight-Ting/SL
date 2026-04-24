@@ -4,7 +4,7 @@ import pytest
 
 from symboliclight.ast import App, Module
 from symboliclight.diagnostics import SymbolicLightError
-from symboliclight.parser import parse_source
+from symboliclight.parser import parse_source, parse_source_result
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,3 +58,27 @@ module bad {
         parse_source(source, path="bad.sl")
 
     assert any("Expected module item" in diagnostic.message for diagnostic in exc.value.diagnostics)
+
+
+def test_parse_source_result_reports_multiple_errors() -> None:
+    source = """
+app Broken {
+  nonsense
+
+  type Todo = {
+    id Id<Todo>,
+    title: Text,
+  }
+
+  fn ok() -> Bool {
+    return true
+  }
+}
+"""
+
+    result = parse_source_result(source, path="broken.sl")
+
+    assert result.unit is not None
+    assert result.recovered
+    assert len([diagnostic for diagnostic in result.diagnostics if diagnostic.severity == "error"]) >= 2
+    assert all(diagnostic.code.startswith("SLP") for diagnostic in result.diagnostics)

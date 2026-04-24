@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from symboliclight.ast import (
     App,
+    Arg,
     AssertStmt,
     BinaryExpr,
     CallExpr,
@@ -34,6 +36,16 @@ GENERIC_ARITY = {"Id": 1, "List": 1, "Option": 1, "Result": 2}
 STORE_METHODS = {"insert", "all", "get", "update", "delete", "filter"}
 
 
+@dataclass(slots=True)
+class CheckResult:
+    diagnostics: list[Diagnostic]
+    unit: Unit
+    imports: dict[str, Module] = field(default_factory=dict)
+    symbol_table: dict[str, str] = field(default_factory=dict)
+    dependency_paths: set[Path] = field(default_factory=set)
+    missing_dependency_paths: set[Path] = field(default_factory=set)
+
+
 class Checker:
     def __init__(
         self,
@@ -42,12 +54,16 @@ class Checker:
         source_path: Path,
         strict_intent: bool = False,
         seen: set[Path] | None = None,
+        import_chain: list[Path] | None = None,
     ) -> None:
         self.unit = unit
         self.source_path = source_path.resolve()
         self.strict_intent = strict_intent
         self.seen = seen or set()
+        self.import_chain = import_chain or [self.source_path]
         self.diagnostics: list[Diagnostic] = []
+        self.dependency_paths: set[Path] = set()
+        self.missing_dependency_paths: set[Path] = set()
         self.context_kind = "fn"
 
         self.types = {type_decl.name: type_decl for type_decl in unit.types}
@@ -61,6 +77,9 @@ class Checker:
             self.stores = {}
 
     def run(self) -> list[Diagnostic]:
+        return self.run_result().diagnostics
+
+    def run_result(self) -> CheckResult:
         self.load_imports()
         self.check_duplicate_names()
         if isinstance(self.unit, App):
@@ -91,25 +110,55 @@ class Checker:
         else:
             for function in self.unit.functions:
                 self.check_function(function)
-        return self.diagnostics
+        return CheckResult(
+            diagnostics=self.diagnostics,
+            unit=self.unit,
+            imports=dict(self.unit.imported_modules),
+            symbol_table=self.symbol_table(),
+            dependency_paths=set(self.dependency_paths),
+            missing_dependency_paths=set(self.missing_dependency_paths),
+        )
 
     def load_imports(self) -> None:
+        aliases: set[str] = set()
+        local_names = self.local_decl_names()
         for import_decl in self.unit.imports:
+            if import_decl.alias in aliases:
+                self.error(
+                    f"Duplicate import alias `{import_decl.alias}`.",
+                    import_decl.location,
+                    "Use a unique alias for each import.",
+                    code="SLC010",
+                )
+                continue
+            aliases.add(import_decl.alias)
+            if import_decl.alias in local_names:
+                self.error(
+                    f"Import alias `{import_decl.alias}` conflicts with a local declaration.",
+                    import_decl.location,
+                    "Rename the import alias or the local declaration.",
+                    code="SLC011",
+                )
             import_path = (self.source_path.parent / import_decl.path).resolve()
             if import_path in self.seen:
+                chain = " -> ".join(str(path) for path in [*self.import_chain, import_path])
                 self.error(
-                    f"Cyclic import detected for `{import_decl.path}`.",
+                    f"Cyclic import detected: {chain}",
                     import_decl.location,
                     "Break the import cycle or move shared declarations into a lower-level module.",
+                    code="SLC012",
                 )
                 continue
             if not import_path.exists():
+                self.missing_dependency_paths.add(import_path)
                 self.error(
                     f"Import file not found: {import_decl.path}",
                     import_decl.location,
                     "Create the module file or fix the import path.",
+                    code="SLC013",
                 )
                 continue
+            self.dependency_paths.add(import_path)
             try:
                 imported = parse_source(import_path.read_text(encoding="utf-8"), path=str(import_path))
             except SymbolicLightError as exc:
@@ -120,6 +169,7 @@ class Checker:
                     f"Import `{import_decl.path}` must point to a module file.",
                     import_decl.location,
                     "Use `module Name { ... }` in files imported by an app.",
+                    code="SLC014",
                 )
                 continue
             nested_checker = Checker(
@@ -127,8 +177,12 @@ class Checker:
                 source_path=import_path,
                 strict_intent=self.strict_intent,
                 seen={*self.seen, self.source_path},
+                import_chain=[*self.import_chain, import_path],
             )
-            self.diagnostics.extend(nested_checker.run())
+            nested_result = nested_checker.run_result()
+            self.diagnostics.extend(nested_result.diagnostics)
+            self.dependency_paths.update(nested_result.dependency_paths)
+            self.missing_dependency_paths.update(nested_result.missing_dependency_paths)
             self.unit.imported_modules[import_decl.alias] = imported
             for type_decl in imported.types:
                 self.types[f"{import_decl.alias}.{type_decl.name}"] = self.qualify_type_decl(
@@ -144,6 +198,29 @@ class Checker:
                     import_decl.alias,
                     imported,
                 )
+
+    def local_decl_names(self) -> set[str]:
+        names = {type_decl.name for type_decl in self.unit.types}
+        names.update(enum_decl.name for enum_decl in self.unit.enums)
+        names.update(function.name for function in self.unit.functions)
+        if isinstance(self.unit, App):
+            names.update(store.name for store in self.unit.stores)
+        return names
+
+    def symbol_table(self) -> dict[str, str]:
+        symbols: dict[str, str] = {}
+        for type_decl in self.unit.types:
+            symbols[type_decl.name] = "type"
+        for enum_decl in self.unit.enums:
+            symbols[enum_decl.name] = "enum"
+        for function in self.unit.functions:
+            symbols[function.name] = function.kind
+        for alias in self.unit.imported_modules:
+            symbols[alias] = "import"
+        if isinstance(self.unit, App):
+            for store in self.unit.stores:
+                symbols[store.name] = "store"
+        return symbols
 
     def qualify_type_decl(self, type_decl: TypeDecl, alias: str, module: Module) -> TypeDecl:
         fields = [
@@ -196,12 +273,14 @@ class Checker:
         for intent in self.unit.intents:
             path = (self.source_path.parent / intent).resolve()
             if not path.exists():
+                self.missing_dependency_paths.add(path)
                 self.error(
                     f"IntentSpec file not found: {intent}",
                     self.unit.location,
                     "Create the intent file or remove the intent declaration.",
                 )
                 continue
+            self.dependency_paths.add(path)
             try:
                 from intentspec_core.spec.parser import load_spec  # type: ignore
             except Exception:
@@ -288,6 +367,13 @@ class Checker:
                 "Use GET, POST, PUT, PATCH, or DELETE in v0.2.",
             )
         self.check_type_ref(route.return_type, route.location)
+        if not self.is_json_encodable(route.return_type):
+            self.error(
+                f"Route return type `{route.return_type.render()}` is not JSON encodable.",
+                route.location,
+                "Return a primitive, enum, record, Option, Result, or List of JSON encodable values.",
+                code="SLC040",
+            )
         env = {"request": TypeRef("Request")}
         self.check_block(route.body, expected_return=route.return_type, local_env=env, context_kind="route")
 
@@ -394,6 +480,14 @@ class Checker:
             return TypeRef("Unknown")
         root = env.get(parts[0])
         if root is None:
+            if parts[0] in self.unit.imported_modules:
+                self.error(
+                    f"Unresolved imported symbol `{'.'.join(parts)}`.",
+                    location,
+                    "Check the imported module declarations and the qualified name.",
+                    code="SLC020",
+                )
+                return TypeRef("Unknown")
             self.error(f"Unknown value `{parts[0]}`.", location, "Declare it with `let` or as a parameter.")
             return TypeRef("Unknown")
         current = root
@@ -426,14 +520,8 @@ class Checker:
                     expr.location,
                     "Move shared logic into a pure `fn`, then call it from commands, routes, or tests.",
                 )
-            positional = [arg for arg in expr.args if arg.name is None]
-            if len(positional) != len(function.params):
-                self.error(
-                    f"Function `{function.name}` called with wrong argument count.",
-                    expr.location,
-                    "Pass one positional argument for each declared parameter.",
-                )
-            for arg, param in zip(positional, function.params):
+            ordered_args = self.bind_call_args(expr, function)
+            for arg, param in ordered_args:
                 actual = self.infer_expr(arg.expr, env)
                 if not self.type_matches(param.type_ref, actual):
                     self.error(
@@ -444,8 +532,78 @@ class Checker:
             return function.return_type
         if len(expr.callee) == 1 and expr.callee[0] in self.types:
             return TypeRef(expr.callee[0])
-        self.error(f"Unknown function or constructor `{name}`.", expr.location, "Declare it before use.")
+        if expr.callee and expr.callee[0] in self.unit.imported_modules:
+            self.error(
+                f"Unresolved imported symbol `{name}`.",
+                expr.location,
+                "Check the imported module declarations and the qualified function name.",
+                code="SLC020",
+            )
+        else:
+            self.error(f"Unknown function or constructor `{name}`.", expr.location, "Declare it before use.")
         return TypeRef("Unknown")
+
+    def bind_call_args(self, expr: CallExpr, function: FunctionDecl) -> list[tuple[Arg, Param]]:
+        params_by_name = {param.name: param for param in function.params}
+        bound: dict[str, Arg] = {}
+        ordered: list[tuple[Arg, Param]] = []
+        seen_named = False
+        positional_index = 0
+        for arg in expr.args:
+            if arg.name is None:
+                if seen_named:
+                    self.error(
+                        "Positional arguments cannot follow named arguments.",
+                        arg.location,
+                        "Move positional arguments before named arguments.",
+                        code="SLC021",
+                    )
+                    continue
+                if positional_index >= len(function.params):
+                    self.error(
+                        f"Function `{function.name}` called with too many arguments.",
+                        arg.location,
+                        "Remove extra arguments or update the function signature.",
+                        code="SLC022",
+                    )
+                    continue
+                param = function.params[positional_index]
+                bound[param.name] = arg
+                ordered.append((arg, param))
+                positional_index += 1
+                continue
+            seen_named = True
+            param = params_by_name.get(arg.name)
+            if param is None:
+                self.error(
+                    f"Function `{function.name}` has no parameter `{arg.name}`.",
+                    arg.location,
+                    "Use a declared parameter name.",
+                    code="SLC023",
+                )
+                continue
+            if arg.name in bound:
+                self.error(
+                    f"Argument `{arg.name}` is provided more than once.",
+                    arg.location,
+                    "Provide each argument once.",
+                    code="SLC024",
+                )
+                continue
+            bound[arg.name] = arg
+        for param in function.params:
+            arg = bound.get(param.name)
+            if arg is None:
+                self.error(
+                    f"Missing argument `{param.name}` for function `{function.name}`.",
+                    expr.location,
+                    "Pass every required argument.",
+                    code="SLC025",
+                )
+                continue
+            if (arg, param) not in ordered:
+                ordered.append((arg, param))
+        return ordered
 
     def infer_store_call(self, expr: CallExpr, env: dict[str, TypeRef]) -> TypeRef:
         store = self.stores[expr.callee[0]]
@@ -464,6 +622,15 @@ class Checker:
                 "Use insert, all, get, update, delete, or filter.",
             )
             return TypeRef("Unknown")
+        if method != "filter":
+            for arg in expr.args:
+                if arg.name is not None:
+                    self.error(
+                        f"Store method `{'.'.join(expr.callee)}` does not accept named arguments.",
+                        arg.location,
+                        "Use positional arguments for this store method.",
+                        code="SLC050",
+                    )
         if method == "insert":
             self.expect_arg_count(expr, 1)
             if expr.args:
@@ -565,8 +732,19 @@ class Checker:
         if record is None:
             return
         fields = {field.name: field for field in record.fields}
-        provided = {field.name: field for field in expr.fields}
+        provided: dict[str, object] = {}
+        seen_fields: set[str] = set()
         for field in expr.fields:
+            if field.name in seen_fields:
+                self.error(
+                    f"Field `{field.name}` is provided more than once.",
+                    field.location,
+                    "Provide each record field once.",
+                    code="SLC030",
+                )
+                continue
+            seen_fields.add(field.name)
+            provided[field.name] = field
             expected_field = fields.get(field.name)
             if expected_field is None:
                 self.error(
@@ -663,9 +841,38 @@ class Checker:
     def is_optional(self, type_ref: TypeRef) -> bool:
         return type_ref.name == "Option"
 
-    def error(self, message: str, location: SourceLocation, suggestion: str) -> None:
-        self.diagnostics.append(Diagnostic(message, location, suggestion))
+    def is_json_encodable(self, type_ref: TypeRef) -> bool:
+        if type_ref.name in PRIMITIVES or type_ref.name == "Unknown":
+            return True
+        if type_ref.name == "Id":
+            return bool(type_ref.args)
+        if type_ref.name in self.enums:
+            return True
+        if type_ref.name in self.types:
+            record = self.types[type_ref.name]
+            return all(self.is_json_encodable(field.type_ref) for field in record.fields)
+        if type_ref.name in {"List", "Option"} and len(type_ref.args) == 1:
+            return self.is_json_encodable(type_ref.args[0])
+        if type_ref.name == "Result" and len(type_ref.args) == 2:
+            return self.is_json_encodable(type_ref.args[0]) and self.is_json_encodable(type_ref.args[1])
+        if type_ref.name == "Response" and len(type_ref.args) <= 1:
+            return not type_ref.args or self.is_json_encodable(type_ref.args[0])
+        return False
+
+    def error(
+        self,
+        message: str,
+        location: SourceLocation,
+        suggestion: str,
+        *,
+        code: str = "SLC001",
+    ) -> None:
+        self.diagnostics.append(Diagnostic(message, location, suggestion, code=code))
 
 
 def check_program(unit: Unit, *, source_path: Path, strict_intent: bool = False) -> list[Diagnostic]:
-    return Checker(unit, source_path=source_path, strict_intent=strict_intent).run()
+    return check_program_result(unit, source_path=source_path, strict_intent=strict_intent).diagnostics
+
+
+def check_program_result(unit: Unit, *, source_path: Path, strict_intent: bool = False) -> CheckResult:
+    return Checker(unit, source_path=source_path, strict_intent=strict_intent).run_result()

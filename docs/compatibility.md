@@ -47,5 +47,19 @@ Still experimental:
 - `Result<T, E>` expression ergonomics,
 - IntentSpec acceptance execution,
 - permissions enforcement,
-- source-map behavior beyond generated comments,
+- source-map behavior beyond v0.3 sidecar maps and best-effort runtime backreferences,
 - standard library APIs beyond SQLite, CLI, JSON HTTP, and tests.
+
+## v0.3 Notes
+
+v0.3 keeps v0.2 syntax intact and tightens behavior:
+
+- duplicate import aliases are rejected,
+- import aliases may not collide with local declarations,
+- function and command named arguments are checked,
+- record literal duplicate fields are rejected,
+- route return types must be JSON encodable,
+- `slc check` may reuse `.slcache/` diagnostics unless `--no-cache` is used,
+- `slc build` emits `.slmap.json` by default unless `--no-source-map` is used.
+
+These checks may reject programs that previously compiled accidentally.

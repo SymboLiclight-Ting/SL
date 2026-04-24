@@ -10,7 +10,7 @@ SymbolicLight is not trying to replace Python, Rust, or TypeScript everywhere. I
 
 ## Current MVP
 
-The v0.2 compiler supports:
+The v0.3 compiler supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -21,15 +21,19 @@ The v0.2 compiler supports:
 - `Option<T>` and `Result<T, E>` type references.
 - `store` declarations backed by SQLite.
 - `command` handlers compiled to CLI subcommands.
-- `route GET/POST` handlers compiled to JSON HTTP routes.
+- `route GET/POST/PUT/PATCH/DELETE` handlers compiled to JSON HTTP routes.
 - `test` blocks compiled to lightweight Python assertions.
 - official formatting through `slc fmt`.
+- source-map sidecars and best-effort `.sl` runtime backreferences.
+- incremental `slc check` cache reuse.
+- JSON diagnostics for tools through `slc check --json`.
 
 ## Quick Start
 
 ```bash
 pip install -e ".[dev]"
 slc check examples/todo_app.sl
+slc check examples/todo_app.sl --json
 slc build examples/todo_app.sl --out build/todo_app.py
 slc fmt examples/todo_app.sl --check
 slc doctor examples/todo_app.sl
@@ -119,7 +123,10 @@ IntentSpec validation is optional in normal `slc check` runs. If the `intentspec
 
 ```bash
 slc check <file.sl>
+slc check <file.sl> --json
+slc check <file.sl> --no-cache
 slc build <file.sl> --out build/app.py
+slc build <file.sl> --out build/app.py --no-source-map
 slc run <file.sl> -- add "Buy milk"
 slc test <file.sl>
 slc fmt <file.sl>

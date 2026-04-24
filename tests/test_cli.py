@@ -1,7 +1,8 @@
 from pathlib import Path
+import json
 import py_compile
 
-from symboliclight.cli import main
+from symboliclight.cli import load_checked_unit, main
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,7 +15,31 @@ def test_cli_check_build_and_test(tmp_path: Path) -> None:
     assert main(["check", str(source)]) == 0
     assert main(["build", str(source), "--out", str(output)]) == 0
     py_compile.compile(str(output), doraise=True)
+    assert Path(str(output) + ".slmap.json").exists()
     assert main(["test", str(source)]) == 0
+
+
+def test_cli_build_can_skip_source_map(tmp_path: Path) -> None:
+    source = ROOT / "examples" / "todo_app.sl"
+    output = tmp_path / "todo_app.py"
+    source_map = Path(str(output) + ".slmap.json")
+
+    assert main(["build", str(source), "--out", str(output)]) == 0
+    assert source_map.exists()
+    assert main(["build", str(source), "--out", str(output), "--no-source-map"]) == 0
+
+    assert output.exists()
+    assert not source_map.exists()
+
+
+def test_cli_build_imported_app_after_cached_check(tmp_path: Path) -> None:
+    source = ROOT / "examples" / "issue_tracker.sl"
+    output = tmp_path / "issue_tracker.py"
+
+    assert main(["check", str(source)]) == 0
+    assert main(["build", str(source), "--out", str(output)]) == 0
+
+    py_compile.compile(str(output), doraise=True)
 
 
 def test_cli_fmt_doctor_init_new_and_add_route(tmp_path: Path, monkeypatch) -> None:
@@ -54,3 +79,117 @@ app Commented {
 
     assert main(["fmt", str(source)]) == 1
     assert source.read_text(encoding="utf-8") == original
+
+
+def test_cli_check_json_outputs_machine_readable_diagnostics(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "bad.sl"
+    source.write_text(
+        """
+app Bad {
+  store items: Missing
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["check", str(source), "--json"]) == 1
+    output = capsys.readouterr().out
+    diagnostics = json.loads(output)
+
+    assert diagnostics[0]["severity"] == "error"
+    assert diagnostics[0]["code"]
+    assert diagnostics[0]["suggestion"]
+
+
+def test_cli_build_failure_does_not_overwrite_output(tmp_path: Path) -> None:
+    source = tmp_path / "bad.sl"
+    output = tmp_path / "app.py"
+    output.write_text("keep me", encoding="utf-8")
+    source.write_text(
+        """
+app Bad {
+  store items: Missing
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["build", str(source), "--out", str(output)]) == 1
+    assert output.read_text(encoding="utf-8") == "keep me"
+
+
+def test_check_cache_hits_and_invalidates_imports(tmp_path: Path) -> None:
+    module = tmp_path / "models.sl"
+    module.write_text("module models { fn ok() -> Bool { return true } }", encoding="utf-8")
+    source = tmp_path / "app.sl"
+    source.write_text(
+        """
+app CacheDemo {
+  import "./models.sl" as models
+
+  test "ok" {
+    assert models.ok() == true
+  }
+}
+""",
+        encoding="utf-8",
+    )
+
+    _, first_diagnostics, first_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+    _, second_diagnostics, second_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+    module.write_text("module models { fn ok() -> Bool { return false } }", encoding="utf-8")
+    _, third_diagnostics, third_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+
+    assert not first_hit
+    assert second_hit
+    assert not third_hit
+    assert first_diagnostics == second_diagnostics
+    assert not [diagnostic for diagnostic in third_diagnostics if diagnostic.severity == "error"]
+
+
+def test_check_cache_invalidates_when_missing_import_is_created(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    source.write_text(
+        """
+app CacheDemo {
+  import "./models.sl" as models
+}
+""",
+        encoding="utf-8",
+    )
+
+    _, first_diagnostics, first_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+    _, second_diagnostics, second_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+    (tmp_path / "models.sl").write_text("module models { fn ok() -> Bool { return true } }", encoding="utf-8")
+    _, third_diagnostics, third_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+
+    assert not first_hit
+    assert second_hit
+    assert not third_hit
+    assert any("Import file not found" in diagnostic.message for diagnostic in first_diagnostics)
+    assert first_diagnostics == second_diagnostics
+    assert not [diagnostic for diagnostic in third_diagnostics if diagnostic.severity == "error"]
+
+
+def test_check_cache_invalidates_when_missing_intent_is_created(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    source.write_text(
+        """
+app CacheDemo {
+  intent "./app.intent.yaml"
+}
+""",
+        encoding="utf-8",
+    )
+
+    _, first_diagnostics, first_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+    _, second_diagnostics, second_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+    (tmp_path / "app.intent.yaml").write_text('version: "0.1"\nkind: "IntentSpec"\n', encoding="utf-8")
+    _, third_diagnostics, third_hit = load_checked_unit(source, strict_intent=False, use_cache=True)
+
+    assert not first_hit
+    assert second_hit
+    assert not third_hit
+    assert any("IntentSpec file not found" in diagnostic.message for diagnostic in first_diagnostics)
+    assert first_diagnostics == second_diagnostics
+    assert not any("IntentSpec file not found" in diagnostic.message for diagnostic in third_diagnostics)

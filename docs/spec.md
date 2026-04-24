@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.2
+# SymbolicLight Language Specification v0.3
 
-This document defines SymbolicLight v0.2 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.3 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 ## Source Units
 
@@ -28,6 +28,8 @@ import "./models.sl" as models
 ```
 
 Imported declarations are referenced through the alias, for example `models.Issue`, `models.Status.open`, or `models.is_open(value)`. SymbolicLight has no implicit global sharing.
+
+Import aliases must be unique in one source unit and must not collide with local `type`, `enum`, `fn`, `command`, or `store` declarations. Cyclic imports are rejected with an import-chain diagnostic.
 
 ## IntentSpec Declarations
 
@@ -86,7 +88,7 @@ Enum variants are referenced with `Status.open` or an imported path such as `mod
 store todos: Todo
 ```
 
-Stores are backed by SQLite in v0.2. Supported methods:
+Stores are backed by SQLite in v0.3. Supported methods:
 
 ```text
 todos.insert(record) -> Todo
@@ -97,15 +99,17 @@ todos.delete(id) -> Bool
 todos.filter(field: value) -> List<Todo>
 ```
 
-`insert` and `update` require record literals in v0.2. The checker validates unknown fields, missing required fields, and obvious field type mismatches.
+`insert` and `update` require record literals in v0.3. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
 
 `get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
 
-`filter` requires named arguments and validates each filter value against the matching record field type.
+`filter` requires named arguments and validates each filter value against the matching record field type. Other store methods use positional arguments in v0.3.
 
 ### `fn`
 
 `fn` is pure application logic. It must not call store methods, commands, routes, or runtime side effects. Imported module functions compile into generated Python with stable names such as `fn_models_is_open`.
+
+Function and command calls support positional arguments and named arguments. Named arguments are matched to declared parameter names. Unknown, duplicate, or missing named arguments are rejected. Positional arguments may not follow named arguments.
 
 ### `command`
 
@@ -121,7 +125,7 @@ route GET "/todos" -> List<Todo> {
 }
 ```
 
-v0.2 supports `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`. Request body fields are read through `request.body.field`.
+v0.3 supports `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`. Request body fields are read through `request.body.field`. Route return types must be JSON encodable: primitives, enums, records, `Id<T>`, `List<T>`, `Option<T>`, `Result<T, E>`, or `Response<T>`.
 
 ### `test`
 
@@ -169,7 +173,10 @@ v0.2 supports:
 
 ```bash
 slc check <path>
+slc check <path> --json
+slc check <path> --no-cache
 slc build <path> --out build/app.py
+slc build <path> --out build/app.py --no-source-map
 slc run <path> -- <generated-app-args>
 slc test <path>
 slc fmt <path>
@@ -179,7 +186,9 @@ slc new api <name>
 slc add route GET /items <path>
 ```
 
-`slc fmt` is intentionally conservative in v0.2. It refuses to rewrite files containing `//` comments because the formatter does not yet have comment-preserving trivia support.
+`slc fmt` is intentionally conservative in v0.3. It refuses to rewrite files containing `//` comments because the formatter does not yet have comment-preserving trivia support.
+
+`slc check --json` emits a machine-readable diagnostics array with `severity`, `code`, `message`, `file`, `line`, `column`, and `suggestion`.
 
 ## Generated Python Contract
 
@@ -190,7 +199,36 @@ The compiler emits one Python 3.11 file using standard library modules first:
 - `http.server`
 - `json`
 
-Generated code includes `# source: file.sl:line` comments for major functions, routes, and tests.
+Generated code includes `# source: file.sl:line` comments for major functions, routes, and tests. `slc build` also emits a sidecar source map by default:
+
+```text
+build/app.py
+build/app.py.slmap.json
+```
+
+The source map contains:
+
+- `version`
+- `source`
+- `generated`
+- `line_map`
+- `symbols`
+
+Generated test and runtime exceptions print a best-effort `SL source: file.sl:line:column` backreference when a mapped generated line is available. `slc build --no-source-map` suppresses the sidecar file but generated Python still contains the inline runtime map.
+
+## Incremental Check Cache
+
+`slc check` reuses cached diagnostics when the root source, imported module hashes, intent file hashes, missing dependency state, strict IntentSpec mode, and compiler cache version match. Creating a previously missing import or intent file invalidates the cached result. `slc check --no-cache` bypasses the cache. Cache files are stored under `.slcache/` and are not part of source control.
+
+## Diagnostics
+
+All compiler diagnostics use the same shape:
+
+```text
+severity + code + message + file + line + column + suggestion
+```
+
+Parser diagnostics use `SLP...` codes. Checker diagnostics use `SLC...` codes. Lexer diagnostics use `SLL...` codes.
 
 ## Out Of Scope Before v0.5
 

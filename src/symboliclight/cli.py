@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 from symboliclight.ast import App, Unit
-from symboliclight.cache import write_check_cache
-from symboliclight.checker import check_program
-from symboliclight.codegen import generate_python
+from symboliclight.cache import read_check_cache, write_check_cache
+from symboliclight.checker import check_program_result
+from symboliclight.codegen import generate_python, generate_python_artifact
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError, raise_if_errors
 from symboliclight.formatter import format_unit
-from symboliclight.parser import parse_source
+from symboliclight.parser import parse_source, parse_source_result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,11 +23,14 @@ def main(argv: list[str] | None = None) -> int:
     check_parser = sub.add_parser("check")
     check_parser.add_argument("source")
     check_parser.add_argument("--strict-intent", action="store_true")
+    check_parser.add_argument("--json", action="store_true")
+    check_parser.add_argument("--no-cache", action="store_true")
 
     build_parser = sub.add_parser("build")
     build_parser.add_argument("source")
     build_parser.add_argument("--out", required=True)
     build_parser.add_argument("--strict-intent", action="store_true")
+    build_parser.add_argument("--no-source-map", action="store_true")
 
     run_parser = sub.add_parser("run")
     run_parser.add_argument("source")
@@ -62,23 +66,38 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "check":
-            _, diagnostics = load_checked_unit(Path(args.source), strict_intent=args.strict_intent)
-            print_diagnostics(diagnostics)
+            _, diagnostics, _ = load_checked_unit(
+                Path(args.source),
+                strict_intent=args.strict_intent,
+                use_cache=not args.no_cache,
+            )
+            print_diagnostics(diagnostics, json_output=args.json)
             if any(diagnostic.severity == "error" for diagnostic in diagnostics):
                 return 1
-            print("ok")
+            if not args.json:
+                print("ok")
             return 0
         if args.command == "build":
-            app, diagnostics = load_checked_app(Path(args.source), strict_intent=args.strict_intent)
+            app, diagnostics, _ = load_checked_app(
+                Path(args.source),
+                strict_intent=args.strict_intent,
+                use_cache=False,
+            )
             print_diagnostics(diagnostics)
             raise_if_errors(diagnostics)
             output = Path(args.out)
+            artifact = generate_python_artifact(app, generated_path=str(output))
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(generate_python(app), encoding="utf-8")
+            output.write_text(artifact.code, encoding="utf-8")
+            source_map_path = Path(str(output) + ".slmap.json")
+            if not args.no_source_map:
+                source_map_path.write_text(json.dumps(artifact.source_map, indent=2), encoding="utf-8")
+            elif source_map_path.exists():
+                source_map_path.unlink()
             print(f"wrote {output}")
             return 0
         if args.command == "run":
-            app, diagnostics = load_checked_app(Path(args.source), strict_intent=False)
+            app, diagnostics, _ = load_checked_app(Path(args.source), strict_intent=False, use_cache=False)
             print_diagnostics(diagnostics)
             raise_if_errors(diagnostics)
             app_args = args.args[1:] if args.args[:1] == ["--"] else args.args
@@ -91,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return completed.returncode
         if args.command == "test":
-            app, diagnostics = load_checked_app(Path(args.source), strict_intent=False)
+            app, diagnostics, _ = load_checked_app(Path(args.source), strict_intent=False, use_cache=False)
             print_diagnostics(diagnostics)
             raise_if_errors(diagnostics)
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -105,9 +124,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "fmt":
             return format_file(Path(args.source), check_only=args.check)
         if args.command == "doctor":
-            unit, diagnostics = load_checked_unit(Path(args.source), strict_intent=args.strict_intent)
+            unit, diagnostics, cache_hit = load_checked_unit(Path(args.source), strict_intent=args.strict_intent)
             print_diagnostics(diagnostics)
-            print(doctor_report(unit, diagnostics, Path(args.source)))
+            print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit))
             return 1 if any(diagnostic.severity == "error" for diagnostic in diagnostics) else 0
         if args.command == "init":
             init_project(Path(args.directory))
@@ -123,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"added route {args.method.upper()} {args.path} to {source}")
             return 0
     except SymbolicLightError as exc:
-        print_diagnostics(exc.diagnostics)
+        print_diagnostics(exc.diagnostics, json_output=getattr(args, "json", False))
         return 1
     except OSError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -131,8 +150,13 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
-def load_checked_app(source_path: Path, *, strict_intent: bool) -> tuple[App, list[Diagnostic]]:
-    unit, diagnostics = load_checked_unit(source_path, strict_intent=strict_intent)
+def load_checked_app(
+    source_path: Path,
+    *,
+    strict_intent: bool,
+    use_cache: bool = False,
+) -> tuple[App, list[Diagnostic], bool]:
+    unit, diagnostics, cache_hit = load_checked_unit(source_path, strict_intent=strict_intent, use_cache=use_cache)
     if not isinstance(unit, App):
         diagnostics.append(
             Diagnostic(
@@ -143,15 +167,34 @@ def load_checked_app(source_path: Path, *, strict_intent: bool) -> tuple[App, li
         )
     raise_if_errors(diagnostics)
     assert isinstance(unit, App)
-    return unit, diagnostics
+    return unit, diagnostics, cache_hit
 
 
-def load_checked_unit(source_path: Path, *, strict_intent: bool) -> tuple[Unit, list[Diagnostic]]:
+def load_checked_unit(
+    source_path: Path,
+    *,
+    strict_intent: bool,
+    use_cache: bool = True,
+) -> tuple[Unit, list[Diagnostic], bool]:
     source = source_path.read_text(encoding="utf-8")
-    unit = parse_source(source, path=str(source_path))
-    diagnostics = check_program(unit, source_path=source_path, strict_intent=strict_intent)
-    write_check_cache(source_path, source, diagnostics)
-    return unit, diagnostics
+    parse_result = parse_source_result(source, path=str(source_path))
+    if parse_result.unit is None or any(diagnostic.severity == "error" for diagnostic in parse_result.diagnostics):
+        raise SymbolicLightError(parse_result.diagnostics)
+    if use_cache:
+        cached = read_check_cache(source_path, source, strict_intent=strict_intent)
+        if cached is not None:
+            return parse_result.unit, cached.diagnostics, True
+    check_result = check_program_result(parse_result.unit, source_path=source_path, strict_intent=strict_intent)
+    diagnostics = [*parse_result.diagnostics, *check_result.diagnostics]
+    write_check_cache(
+        source_path,
+        source,
+        diagnostics,
+        dependency_paths=check_result.dependency_paths,
+        missing_dependency_paths=check_result.missing_dependency_paths,
+        strict_intent=strict_intent,
+    )
+    return parse_result.unit, diagnostics, False
 
 
 def format_file(source_path: Path, *, check_only: bool) -> int:
@@ -192,11 +235,13 @@ def contains_line_comment(source: str) -> bool:
     return False
 
 
-def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path) -> str:
+def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, *, cache_hit: bool) -> str:
     lines = ["SymbolicLight doctor"]
     lines.append(f"- source: {source_path}")
     lines.append(f"- unit: {'app' if isinstance(unit, App) else 'module'} {unit.name}")
     lines.append(f"- diagnostics: {len(diagnostics)}")
+    lines.append(f"- check cache: {'hit' if cache_hit else 'miss'}")
+    lines.append("- source map: generated by default during build")
     if isinstance(unit, App):
         lines.append(f"- intents: {len(unit.intents)}")
         lines.append(f"- imports: {len(unit.imports)}")
@@ -337,7 +382,10 @@ def write_new_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def print_diagnostics(diagnostics: list[Diagnostic]) -> None:
+def print_diagnostics(diagnostics: list[Diagnostic], *, json_output: bool = False) -> None:
+    if json_output:
+        print(json.dumps([diagnostic.to_dict() for diagnostic in diagnostics], indent=2))
+        return
     for diagnostic in diagnostics:
         stream = sys.stderr if diagnostic.severity == "error" else sys.stdout
         print(diagnostic.format(), file=stream)

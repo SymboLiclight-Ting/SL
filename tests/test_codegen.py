@@ -4,7 +4,7 @@ import py_compile
 import subprocess
 import sys
 
-from symboliclight.codegen import generate_python
+from symboliclight.codegen import generate_python, generate_python_artifact
 from symboliclight.checker import check_program
 from symboliclight.parser import parse_source
 
@@ -167,3 +167,39 @@ app Nested {
     )
 
     assert "ok - 1 test(s) passed" in completed.stdout
+
+
+def test_codegen_emits_source_map() -> None:
+    source_path = ROOT / "examples" / "todo_app.sl"
+    app = parse_source(source_path.read_text(encoding="utf-8"), path=str(source_path))
+    artifact = generate_python_artifact(app, generated_path="build/todo_app.py")
+
+    assert artifact.source_map["version"] == 1
+    assert artifact.source_map["generated"] == "build/todo_app.py"
+    assert artifact.source_map["line_map"]
+    assert "cmd_add" in artifact.source_map["symbols"]
+
+
+def test_generated_test_failure_reports_sl_source(tmp_path: Path) -> None:
+    source = """
+app Failing {
+  test "fails" {
+    assert false
+  }
+}
+"""
+    app_path = tmp_path / "failing.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    output = tmp_path / "failing.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    completed = subprocess.run(
+        [sys.executable, str(output), "test"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode != 0
+    assert f"SL source: {app_path}:3:1" in completed.stderr

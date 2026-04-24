@@ -19,13 +19,20 @@ Implemented in the current mainline:
 
 ## v0.3 Reliable Compiler
 
-Next focus:
+Implemented in the current mainline:
 
-- better parser recovery with multiple diagnostics per file,
-- source-map helpers that turn Python exceptions into `.sl` locations,
-- richer route body typing,
-- more complete `Option` and `Result` control-flow ergonomics,
-- incremental check cache reuse instead of write-only cache metadata.
+- parser result API with multiple diagnostics per file,
+- stricter import alias, namespace, named argument, record field, enum, `Option`, and `Result` checks,
+- source-map sidecar files and best-effort generated runtime backreferences,
+- incremental check cache reuse with import, intent, and missing dependency invalidation,
+- `slc check --json`, `slc check --no-cache`, and `slc build --no-source-map`,
+- release diagnostics with stable `severity`, `code`, `message`, `file`, `line`, `column`, and `suggestion` fields.
+
+Deferred to later releases:
+
+- fully typed route body declarations,
+- comment-preserving formatter trivia,
+- full `Option` and `Result` pattern matching ergonomics.
 
 ## v0.4 Standard App Kit
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from symboliclight.ast import (
     App,
     Arg,
@@ -35,7 +37,28 @@ from symboliclight.lexer import Token, lex
 
 
 def parse_source(source: str, *, path: str = "<memory>") -> Unit:
-    return Parser(lex(source, path=path)).parse_unit()
+    result = parse_source_result(source, path=path)
+    if result.unit is None or any(diagnostic.severity == "error" for diagnostic in result.diagnostics):
+        raise SymbolicLightError(result.diagnostics)
+    return result.unit
+
+
+@dataclass(slots=True)
+class ParseResult:
+    unit: Unit | None
+    diagnostics: list[Diagnostic]
+    recovered: bool = False
+
+
+def parse_source_result(source: str, *, path: str = "<memory>") -> ParseResult:
+    try:
+        tokens = lex(source, path=path)
+    except SymbolicLightError as exc:
+        for diagnostic in exc.diagnostics:
+            if diagnostic.code == "SL000":
+                diagnostic.code = "SLL001"
+        return ParseResult(None, exc.diagnostics, recovered=False)
+    return Parser(tokens).parse_unit_result()
 
 
 class Parser:
@@ -45,12 +68,21 @@ class Parser:
         self.diagnostics: list[Diagnostic] = []
 
     def parse_unit(self) -> Unit:
+        result = self.parse_unit_result()
+        if result.unit is None or any(diagnostic.severity == "error" for diagnostic in result.diagnostics):
+            raise SymbolicLightError(result.diagnostics)
+        return result.unit
+
+    def parse_unit_result(self) -> ParseResult:
+        unit: Unit | None = None
         if self.check_keyword("app"):
-            return self.parse_app()
-        if self.check_keyword("module"):
-            return self.parse_module()
-        self.error("Expected `app` or `module`.")
-        raise SymbolicLightError(self.diagnostics)
+            unit = self.parse_app()
+        elif self.check_keyword("module"):
+            unit = self.parse_module()
+        else:
+            self.error("Expected `app` or `module`.")
+            self.synchronize_item()
+        return ParseResult(unit, self.diagnostics, recovered=bool(self.diagnostics))
 
     def parse_app(self) -> App:
         app_location = self.current().location
@@ -96,8 +128,6 @@ class Parser:
 
         self.expect_symbol("}")
         self.expect_kind("eof", "Expected end of file.")
-        if self.diagnostics:
-            raise SymbolicLightError(self.diagnostics)
         return App(
             name,
             intents,
@@ -138,8 +168,6 @@ class Parser:
 
         self.expect_symbol("}")
         self.expect_kind("eof", "Expected end of file.")
-        if self.diagnostics:
-            raise SymbolicLightError(self.diagnostics)
         return Module(name, imports, types, enums, functions, module_location)
 
     def parse_import_decl(self) -> ImportDecl:
@@ -156,11 +184,16 @@ class Parser:
         variants: list[str] = []
         if self.match_symbol("}"):
             return EnumDecl(name, variants, location)
-        while True:
+        while not self.at_end():
             variants.append(self.expect_ident("Expected enum variant."))
             if self.match_symbol("}"):
                 break
-            self.expect_symbol(",")
+            if not self.match_symbol(","):
+                self.error("Expected `,` or `}` in enum declaration.")
+                self.synchronize_until({",", "}"})
+                self.match_symbol(",")
+                if self.match_symbol("}"):
+                    break
         return EnumDecl(name, variants, location)
 
     def parse_type_decl(self) -> TypeDecl:
@@ -174,7 +207,10 @@ class Parser:
             field_name = self.expect_ident("Expected field name.")
             self.expect_symbol(":")
             fields.append(FieldDecl(field_name, self.parse_type_ref(), field_location))
-            self.match_symbol(",")
+            if not self.match_symbol(",") and not self.check_symbol("}"):
+                self.error("Expected `,` or `}` after field declaration.")
+                self.synchronize_until({",", "}"})
+                self.match_symbol(",")
         self.expect_symbol("}")
         return TypeDecl(name, fields, location)
 
@@ -215,32 +251,45 @@ class Parser:
         params: list[Param] = []
         if self.match_symbol(")"):
             return params
-        while True:
+        while not self.at_end():
             location = self.current().location
             name = self.expect_ident("Expected parameter name.")
             self.expect_symbol(":")
             params.append(Param(name, self.parse_type_ref(), location))
             if self.match_symbol(")"):
                 break
-            self.expect_symbol(",")
+            if not self.match_symbol(","):
+                self.error("Expected `,` or `)` after parameter.")
+                self.synchronize_until({",", ")"})
+                self.match_symbol(",")
+                if self.match_symbol(")"):
+                    break
         return params
 
     def parse_type_ref(self) -> TypeRef:
         name = self.parse_dotted_name("Expected type name.")
         args: list[TypeRef] = []
         if self.match_symbol("<"):
-            while True:
+            while not self.at_end():
                 args.append(self.parse_type_ref())
                 if self.match_symbol(">"):
                     break
-                self.expect_symbol(",")
+                if not self.match_symbol(","):
+                    self.error("Expected `,` or `>` after type argument.")
+                    self.synchronize_until({",", ">"})
+                    self.match_symbol(",")
+                    if self.match_symbol(">"):
+                        break
         return TypeRef(name, args)
 
     def parse_block(self) -> list[Stmt]:
         self.expect_symbol("{")
         statements: list[Stmt] = []
         while not self.check_symbol("}") and not self.at_end():
+            before = self.index
             statements.append(self.parse_stmt())
+            if self.index == before:
+                self.synchronize_stmt()
         self.expect_symbol("}")
         return statements
 
@@ -311,25 +360,35 @@ class Parser:
         fields: list[RecordField] = []
         if self.match_symbol("}"):
             return RecordExpr(fields, location)
-        while True:
+        while not self.at_end():
             field_location = self.current().location
             name = self.expect_ident("Expected record field name.")
             self.expect_symbol(":")
             fields.append(RecordField(name, self.parse_expr(), field_location))
             if self.match_symbol("}"):
                 break
-            self.expect_symbol(",")
+            if not self.match_symbol(","):
+                self.error("Expected `,` or `}` after record field.")
+                self.synchronize_until({",", "}"})
+                self.match_symbol(",")
+                if self.match_symbol("}"):
+                    break
         return RecordExpr(fields, location)
 
     def parse_list(self, location) -> ListExpr:
         items: list[Expr] = []
         if self.match_symbol("]"):
             return ListExpr(items, location)
-        while True:
+        while not self.at_end():
             items.append(self.parse_expr())
             if self.match_symbol("]"):
                 break
-            self.expect_symbol(",")
+            if not self.match_symbol(","):
+                self.error("Expected `,` or `]` after list item.")
+                self.synchronize_until({",", "]"})
+                self.match_symbol(",")
+                if self.match_symbol("]"):
+                    break
         return ListExpr(items, location)
 
     def parse_path_or_call(self) -> Expr:
@@ -342,17 +401,26 @@ class Parser:
         args: list[Arg] = []
         if self.match_symbol(")"):
             return CallExpr(parts, args, location)
-        while True:
+        seen_named = False
+        while not self.at_end():
             arg_location = self.current().location
             if (self.check_kind("ident") or self.check_kind("keyword")) and self.peek_symbol(":"):
                 name = self.advance().value
                 self.expect_symbol(":")
                 args.append(Arg(name, self.parse_expr(), arg_location))
+                seen_named = True
             else:
+                if seen_named:
+                    self.error("Positional arguments cannot follow named arguments.")
                 args.append(Arg(None, self.parse_expr(), arg_location))
             if self.match_symbol(")"):
                 break
-            self.expect_symbol(",")
+            if not self.match_symbol(","):
+                self.error("Expected `,` or `)` after argument.")
+                self.synchronize_until({",", ")"})
+                self.match_symbol(",")
+                if self.match_symbol(")"):
+                    break
         return CallExpr(parts, args, location)
 
     def parse_dotted_name(self, message: str) -> str:
@@ -435,7 +503,7 @@ class Parser:
 
     def error(self, message: str) -> None:
         self.diagnostics.append(
-            Diagnostic(message, self.current().location, "Check the SymbolicLight v0 syntax.")
+            Diagnostic(message, self.current().location, "Check the SymbolicLight v0 syntax.", code="SLP001")
         )
 
     def synchronize_item(self) -> None:
@@ -456,5 +524,28 @@ class Parser:
                 "route",
                 "test",
             }:
+                return
+            self.advance()
+
+    def synchronize_stmt(self) -> None:
+        if not self.at_end():
+            self.advance()
+        while not self.at_end():
+            if self.check_symbol("}"):
+                return
+            if self.current().kind == "keyword" and self.current().value in {
+                "let",
+                "return",
+                "assert",
+                "if",
+            }:
+                return
+            self.advance()
+
+    def synchronize_until(self, symbols: set[str]) -> None:
+        while not self.at_end():
+            if self.current().kind == "symbol" and self.current().value in symbols:
+                return
+            if self.check_symbol("}"):
                 return
             self.advance()
