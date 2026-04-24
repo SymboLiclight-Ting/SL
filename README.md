@@ -8,9 +8,18 @@ SymbolicLight is not trying to replace Python, Rust, or TypeScript everywhere. I
 
 > Write application intent, data models, storage, routes, commands, and tests in one compact source file, then compile to ordinary Python.
 
+## Naming
+
+- Formal project and brand name: SymbolicLight.
+- Developer-facing language name: SL.
+- Compiler command: `slc`.
+- Source file extension: `.sl`.
+
+Use SymbolicLight in project, website, release, and positioning text. Use SL in developer docs, examples, tutorials, and day-to-day language references.
+
 ## Current MVP
 
-The v0.3 compiler supports:
+The v0.4 compiler supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -22,6 +31,11 @@ The v0.3 compiler supports:
 - `store` declarations backed by SQLite.
 - `command` handlers compiled to CLI subcommands.
 - `route GET/POST/PUT/PATCH/DELETE` handlers compiled to JSON HTTP routes.
+- typed route bodies and `Response<T>` status responses.
+- `fixture` declarations and golden tests.
+- typed `config` declarations.
+- SQLite helpers such as `count`, `exists`, and test-only `clear`.
+- JSON schema generation through `slc schema`.
 - `test` blocks compiled to lightweight Python assertions.
 - official formatting through `slc fmt`.
 - source-map sidecars and best-effort `.sl` runtime backreferences.
@@ -35,6 +49,7 @@ pip install -e ".[dev]"
 slc check examples/todo_app.sl
 slc check examples/todo_app.sl --json
 slc build examples/todo_app.sl --out build/todo_app.py
+slc schema examples/notes_api.sl --out build/notes_schema.json
 slc fmt examples/todo_app.sl --check
 slc doctor examples/todo_app.sl
 python build/todo_app.py test
@@ -66,6 +81,15 @@ app TodoApp {
   route GET "/todos" -> List<Todo> {
     return todos.all()
   }
+}
+```
+
+Typed request bodies and status responses:
+
+```sl
+route POST "/notes" body CreateNote -> Response<Note> {
+  let note = notes.insert({ title: request.body.title, body: request.body.body })
+  return response(status: 201, body: note)
 }
 ```
 
@@ -127,6 +151,7 @@ slc check <file.sl> --json
 slc check <file.sl> --no-cache
 slc build <file.sl> --out build/app.py
 slc build <file.sl> --out build/app.py --no-source-map
+slc schema <file.sl> --out build/schema.json
 slc run <file.sl> -- add "Buy milk"
 slc test <file.sl>
 slc fmt <file.sl>

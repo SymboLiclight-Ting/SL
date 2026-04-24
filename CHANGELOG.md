@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0
+
+- Added typed route request bodies with `body TypeName`.
+- Added `Response<T>` support through `response(status: ..., body: ...)`.
+- Added SQLite helpers: `count`, `exists`, and test-only `clear`.
+- Added generated schema metadata and startup schema drift warnings.
+- Added `fixture` declarations and isolated in-memory fixture loading for tests.
+- Added golden tests for generated output comparison.
+- Added typed `config` declarations backed by `env` and `env_int`.
+- Added thin standard-library builtins: `uuid`, `now`, `read_text`, and `write_text`.
+- Added `slc schema` JSON schema generation.
+- Added the Notes API example as the v0.4 regression app.
+
 ## v0.3.0
 
 - Added parser result APIs for multi-diagnostic recovery.

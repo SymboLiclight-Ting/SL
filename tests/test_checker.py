@@ -319,3 +319,178 @@ app Good {
     diagnostics = check_program(app, source_path=Path("good.sl"))
 
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_get_route_body() -> None:
+    source = """
+app Bad {
+  type Query = {
+    title: Text,
+  }
+
+  route GET "/items" body Query -> Text {
+    return request.body.title
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("GET routes cannot declare" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_delete_route_body() -> None:
+    source = """
+app Bad {
+  type DeleteBody = {
+    reason: Text,
+  }
+
+  route DELETE "/items" body DeleteBody -> Bool {
+    return true
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("DELETE routes cannot declare" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_unknown_route_body_field() -> None:
+    source = """
+app Bad {
+  type CreateTodo = {
+    title: Text,
+  }
+
+  route POST "/todos" body CreateTodo -> Text {
+    return request.body.missing
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("has no field `missing`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_response_body_mismatch() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  route POST "/todos" -> Response<Todo> {
+    return response(status: 201, body: "wrong")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Return type mismatch" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_validates_fixture_records() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  fixture todos {
+    { name: "wrong" }
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("has no field `name`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_allows_clear_only_in_tests() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command clear_all() -> Int {
+    return todos.clear()
+  }
+
+  test "clear" {
+    assert todos.clear() == 0
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("only allowed in tests" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_enforces_write_text_boundary() -> None:
+    source = """
+app Bad {
+  route POST "/write" -> Bool {
+    return write_text("out.txt", "body")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("write_text" in diagnostic.message and "command and test" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_enforces_read_text_boundary() -> None:
+    source = """
+app Bad {
+  config AppConfig = {
+    content: Text = read_text("settings.txt"),
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("read_text" in diagnostic.message and "command, route, and test" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_unknown_builtin_named_arg() -> None:
+    source = """
+app Bad {
+  command load() -> Text {
+    return env(foo: "SL_NAME", default: "app")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Builtin `env` has no argument `foo`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_duplicate_builtin_named_arg() -> None:
+    source = """
+app Bad {
+  route POST "/items" -> Response<Text> {
+    return response(status: 200, status: 201, body: "ok")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Argument `status` is provided more than once" in diagnostic.message for diagnostic in diagnostics)

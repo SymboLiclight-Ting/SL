@@ -14,6 +14,7 @@ from symboliclight.codegen import generate_python, generate_python_artifact
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError, raise_if_errors
 from symboliclight.formatter import format_unit
 from symboliclight.parser import parse_source, parse_source_result
+from symboliclight.schema import generate_schema
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,6 +32,11 @@ def main(argv: list[str] | None = None) -> int:
     build_parser.add_argument("--out", required=True)
     build_parser.add_argument("--strict-intent", action="store_true")
     build_parser.add_argument("--no-source-map", action="store_true")
+
+    schema_parser = sub.add_parser("schema")
+    schema_parser.add_argument("source")
+    schema_parser.add_argument("--out", required=True)
+    schema_parser.add_argument("--strict-intent", action="store_true")
 
     run_parser = sub.add_parser("run")
     run_parser.add_argument("source")
@@ -94,6 +100,19 @@ def main(argv: list[str] | None = None) -> int:
                 source_map_path.write_text(json.dumps(artifact.source_map, indent=2), encoding="utf-8")
             elif source_map_path.exists():
                 source_map_path.unlink()
+            print(f"wrote {output}")
+            return 0
+        if args.command == "schema":
+            app, diagnostics, _ = load_checked_app(
+                Path(args.source),
+                strict_intent=args.strict_intent,
+                use_cache=False,
+            )
+            print_diagnostics(diagnostics)
+            raise_if_errors(diagnostics)
+            output = Path(args.out)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(generate_schema(app), indent=2), encoding="utf-8")
             print(f"wrote {output}")
             return 0
         if args.command == "run":
@@ -248,6 +267,16 @@ def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, 
         lines.append(f"- stores: {len(unit.stores)}")
         lines.append(f"- commands: {len([fn for fn in unit.functions if fn.kind == 'command'])}")
         lines.append(f"- routes: {len(unit.routes)}")
+        routes_with_body = len([route for route in unit.routes if route.body_type is not None])
+        untyped_mutating = [
+            route for route in unit.routes
+            if route.method in {"POST", "PUT", "PATCH"} and route.body_type is None
+        ]
+        lines.append(f"- route schemas: {routes_with_body}/{len(unit.routes)} request bodies typed")
+        if untyped_mutating:
+            rendered = ", ".join(f"{route.method} {route.path}" for route in untyped_mutating)
+            lines.append(f"- route body warning: missing typed body for {rendered}")
+        lines.append("- schema drift: checked by generated Python at startup")
         if any(test.external_ref == "intent.acceptance" for test in unit.tests):
             lines.append("- intent acceptance: declared")
         elif unit.intents:

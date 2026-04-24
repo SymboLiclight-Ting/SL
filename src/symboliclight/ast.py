@@ -53,6 +53,28 @@ class StoreDecl:
 
 
 @dataclass(slots=True)
+class ConfigFieldDecl:
+    name: str
+    type_ref: TypeRef
+    default: "Expr"
+    location: SourceLocation
+
+
+@dataclass(slots=True)
+class ConfigDecl:
+    name: str
+    fields: list[ConfigFieldDecl]
+    location: SourceLocation
+
+
+@dataclass(slots=True)
+class FixtureDecl:
+    store_name: str
+    records: list["RecordExpr"]
+    location: SourceLocation
+
+
+@dataclass(slots=True)
 class Param:
     name: str
     type_ref: TypeRef
@@ -73,6 +95,7 @@ class FunctionDecl:
 class RouteDecl:
     method: str
     path: str
+    body_type: TypeRef | None
     return_type: TypeRef
     body: list["Stmt"]
     location: SourceLocation
@@ -89,6 +112,7 @@ class TestDecl:
     body: list["Stmt"]
     location: SourceLocation
     external_ref: str | None = None
+    golden_path: str | None = None
 
 
 @dataclass(slots=True)
@@ -100,6 +124,8 @@ class App:
     types: list[TypeDecl]
     enums: list[EnumDecl]
     stores: list[StoreDecl]
+    configs: list[ConfigDecl]
+    fixtures: list[FixtureDecl]
     functions: list[FunctionDecl]
     routes: list[RouteDecl]
     tests: list[TestDecl]

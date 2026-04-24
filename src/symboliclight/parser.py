@@ -8,10 +8,13 @@ from symboliclight.ast import (
     AssertStmt,
     BinaryExpr,
     CallExpr,
+    ConfigDecl,
+    ConfigFieldDecl,
     EnumDecl,
     Expr,
     ExprStmt,
     FieldDecl,
+    FixtureDecl,
     FunctionDecl,
     IfStmt,
     ImportDecl,
@@ -96,6 +99,8 @@ class Parser:
         types: list[TypeDecl] = []
         enums: list[EnumDecl] = []
         stores: list[StoreDecl] = []
+        configs: list[ConfigDecl] = []
+        fixtures: list[FixtureDecl] = []
         functions: list[FunctionDecl] = []
         routes: list[RouteDecl] = []
         tests: list[TestDecl] = []
@@ -114,6 +119,10 @@ class Parser:
                 types.append(self.parse_type_decl())
             elif self.match_keyword("store"):
                 stores.append(self.parse_store_decl())
+            elif self.match_keyword("config"):
+                configs.append(self.parse_config_decl())
+            elif self.match_keyword("fixture"):
+                fixtures.append(self.parse_fixture_decl())
             elif self.match_keyword("fn"):
                 functions.append(self.parse_function("fn"))
             elif self.match_keyword("command"):
@@ -136,6 +145,8 @@ class Parser:
             types,
             enums,
             stores,
+            configs,
+            fixtures,
             functions,
             routes,
             tests,
@@ -220,6 +231,45 @@ class Parser:
         self.expect_symbol(":")
         return StoreDecl(name, self.parse_type_ref(), location)
 
+    def parse_config_decl(self) -> ConfigDecl:
+        location = self.previous().location
+        name = self.expect_ident("Expected config name.")
+        self.expect_symbol("=")
+        self.expect_symbol("{")
+        fields: list[ConfigFieldDecl] = []
+        while not self.check_symbol("}") and not self.at_end():
+            field_location = self.current().location
+            field_name = self.expect_ident("Expected config field name.")
+            self.expect_symbol(":")
+            field_type = self.parse_type_ref()
+            self.expect_symbol("=")
+            fields.append(ConfigFieldDecl(field_name, field_type, self.parse_expr(), field_location))
+            if not self.match_symbol(",") and not self.check_symbol("}"):
+                self.error("Expected `,` or `}` after config field.")
+                self.synchronize_until({",", "}"})
+                self.match_symbol(",")
+        self.expect_symbol("}")
+        return ConfigDecl(name, fields, location)
+
+    def parse_fixture_decl(self) -> FixtureDecl:
+        location = self.previous().location
+        store_name = self.expect_ident("Expected fixture store name.")
+        self.expect_symbol("{")
+        records: list[RecordExpr] = []
+        while not self.check_symbol("}") and not self.at_end():
+            record_location = self.current().location
+            if self.match_symbol("{"):
+                records.append(self.parse_record(record_location))
+            else:
+                self.error("Expected fixture record literal.")
+                self.synchronize_until({",", "}"})
+            if not self.match_symbol(",") and not self.check_symbol("}"):
+                self.error("Expected `,` or `}` after fixture record.")
+                self.synchronize_until({",", "}"})
+                self.match_symbol(",")
+        self.expect_symbol("}")
+        return FixtureDecl(store_name, records, location)
+
     def parse_function(self, kind: str) -> FunctionDecl:
         location = self.previous().location
         name = self.expect_ident("Expected function name.")
@@ -233,10 +283,13 @@ class Parser:
         location = self.previous().location
         method = self.expect_ident("Expected HTTP method.").upper()
         path = self.expect_string("Expected route path string.")
+        body_type = None
+        if self.match_keyword("body"):
+            body_type = self.parse_type_ref()
         self.expect_symbol("->")
         return_type = self.parse_type_ref()
         body = self.parse_block()
-        return RouteDecl(method, path, return_type, body, location)
+        return RouteDecl(method, path, body_type, return_type, body, location)
 
     def parse_test(self) -> TestDecl:
         location = self.previous().location
@@ -244,7 +297,10 @@ class Parser:
             external_ref = self.parse_dotted_name("Expected external test source.")
             return TestDecl(external_ref, [], location, external_ref)
         name = self.expect_string("Expected test name.")
-        return TestDecl(name, self.parse_block(), location)
+        golden_path = None
+        if self.match_keyword("golden"):
+            golden_path = self.expect_string("Expected golden file path string.")
+        return TestDecl(name, self.parse_block(), location, golden_path=golden_path)
 
     def parse_params(self) -> list[Param]:
         self.expect_symbol("(")
@@ -518,7 +574,9 @@ class Parser:
                 "permissions",
                 "enum",
                 "type",
+                "config",
                 "store",
+                "fixture",
                 "fn",
                 "command",
                 "route",

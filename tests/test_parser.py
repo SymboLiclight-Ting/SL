@@ -82,3 +82,45 @@ app Broken {
     assert result.recovered
     assert len([diagnostic for diagnostic in result.diagnostics if diagnostic.severity == "error"]) >= 2
     assert all(diagnostic.code.startswith("SLP") for diagnostic in result.diagnostics)
+
+
+def test_parser_accepts_v04_app_kit_syntax() -> None:
+    source = """
+app Notes {
+  type CreateNote = {
+    title: Text,
+  }
+
+  type Note = {
+    id: Id<Note>,
+    title: Text,
+  }
+
+  store notes: Note
+
+  config AppConfig = {
+    port: Int = env_int("PORT", 8000),
+  }
+
+  fixture notes {
+    { title: "Seed" }
+  }
+
+  route POST "/notes" body CreateNote -> Response<Note> {
+    let note = notes.insert({ title: request.body.title })
+    return response(status: 201, body: note)
+  }
+
+  test "list notes" golden "./golden/notes.json" {
+    return notes.all()
+  }
+}
+"""
+
+    app = parse_source(source, path="notes.sl")
+
+    assert isinstance(app, App)
+    assert app.routes[0].body_type is not None
+    assert app.fixtures[0].store_name == "notes"
+    assert app.configs[0].name == "AppConfig"
+    assert app.tests[0].golden_path == "./golden/notes.json"

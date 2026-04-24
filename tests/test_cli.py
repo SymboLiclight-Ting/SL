@@ -19,6 +19,65 @@ def test_cli_check_build_and_test(tmp_path: Path) -> None:
     assert main(["test", str(source)]) == 0
 
 
+def test_cli_notes_example_v04_regression(tmp_path: Path) -> None:
+    source = ROOT / "examples" / "notes_api.sl"
+    output = tmp_path / "notes_api.py"
+    schema = tmp_path / "notes_schema.json"
+
+    assert main(["check", str(source)]) == 0
+    assert main(["schema", str(source), "--out", str(schema)]) == 0
+    assert main(["build", str(source), "--out", str(output)]) == 0
+    py_compile.compile(str(output), doraise=True)
+    assert main(["test", str(source)]) == 0
+
+
+def test_cli_schema_and_doctor_report_v04_status(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    output = tmp_path / "schema.json"
+    source.write_text(
+        """
+app SchemaDemo {
+  type CreateTodo = {
+    title: Text,
+  }
+
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  route POST "/todos" body CreateTodo -> Response<Todo> {
+    let item = todos.insert({ title: request.body.title })
+    return response(status: 201, body: item)
+  }
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["schema", str(source), "--out", str(output)]) == 0
+    schema = json.loads(output.read_text(encoding="utf-8"))
+    assert schema["routes"][0]["body"]["$ref"] == "#/definitions/CreateTodo"
+    assert schema["routes"][0]["response"]["$ref"] == "#/definitions/Todo"
+
+    assert main(["doctor", str(source)]) == 0
+    doctor = capsys.readouterr().out
+    assert "route schemas: 1/1 request bodies typed" in doctor
+
+
+def test_cli_schema_includes_imported_enums(tmp_path: Path) -> None:
+    source = ROOT / "examples" / "issue_tracker.sl"
+    output = tmp_path / "issue_schema.json"
+
+    assert main(["schema", str(source), "--out", str(output)]) == 0
+    schema = json.loads(output.read_text(encoding="utf-8"))
+
+    assert schema["enums"]["models.Status"]["enum"] == ["open", "closed"]
+    assert schema["definitions"]["models.Issue"]["properties"]["status"]["$ref"] == "#/enums/models.Status"
+
+
 def test_cli_build_can_skip_source_map(tmp_path: Path) -> None:
     source = ROOT / "examples" / "todo_app.sl"
     output = tmp_path / "todo_app.py"

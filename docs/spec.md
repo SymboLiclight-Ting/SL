@@ -1,6 +1,8 @@
-# SymbolicLight Language Specification v0.3
+# SymbolicLight Language Specification v0.4
 
-This document defines SymbolicLight v0.3 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.4 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+
+SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
 ## Source Units
 
@@ -16,7 +18,7 @@ An `app` is executable and can be built, run, tested, and served. A `module` is 
 ## Keywords
 
 ```text
-app module import as intent permissions from enum type fn store route command test let return assert if else true false
+app module import as intent permissions from enum type config fn store fixture route body command test golden let return assert if else true false
 ```
 
 ## Imports
@@ -88,7 +90,7 @@ Enum variants are referenced with `Status.open` or an imported path such as `mod
 store todos: Todo
 ```
 
-Stores are backed by SQLite in v0.3. Supported methods:
+Stores are backed by SQLite in v0.4. Supported methods:
 
 ```text
 todos.insert(record) -> Todo
@@ -97,13 +99,33 @@ todos.get(id) -> Option<Todo>
 todos.update(id, record) -> Todo
 todos.delete(id) -> Bool
 todos.filter(field: value) -> List<Todo>
+todos.count() -> Int
+todos.exists(id) -> Bool
+todos.clear() -> Int
 ```
 
-`insert` and `update` require record literals in v0.3. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
+`insert` and `update` require record literals in v0.4. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
 
 `get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
 
-`filter` requires named arguments and validates each filter value against the matching record field type. Other store methods use positional arguments in v0.3.
+`filter` requires named arguments and validates each filter value against the matching record field type. Other store methods use positional arguments.
+
+`clear()` is test-only in v0.4.
+
+Generated Python includes schema metadata and records a schema hash in `sl_migrations`. v0.4 detects schema drift and prints a warning at startup; it does not perform automatic data migrations.
+
+### `config`
+
+Apps may declare typed config values:
+
+```sl
+config AppConfig = {
+  db_path: Text = env("SL_DB", "symboliclight.sqlite"),
+  port: Int = env_int("PORT", 8000),
+}
+```
+
+Config values compile to Python dictionaries and may be read as `AppConfig.port`.
 
 ### `fn`
 
@@ -125,7 +147,40 @@ route GET "/todos" -> List<Todo> {
 }
 ```
 
-v0.3 supports `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`. Request body fields are read through `request.body.field`. Route return types must be JSON encodable: primitives, enums, records, `Id<T>`, `List<T>`, `Option<T>`, `Result<T, E>`, or `Response<T>`.
+v0.4 supports `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`. Request body fields are read through `request.body.field`. Route return types must be JSON encodable: primitives, enums, records, `Id<T>`, `List<T>`, `Option<T>`, `Result<T, E>`, or `Response<T>`.
+
+Routes may declare typed request bodies:
+
+```sl
+route POST "/todos" body CreateTodo -> Todo {
+  return todos.insert({ title: request.body.title, done: false })
+}
+```
+
+`GET` and `DELETE` routes may not declare a body in v0.4. `POST`, `PUT`, and `PATCH` routes may declare a record body. When a body type is declared, `request.body.field` is checked against that record. Generated Python returns `400` for malformed JSON and for missing required body fields.
+
+Routes may return `Response<T>` by using the `response` built-in:
+
+```sl
+route POST "/todos" body CreateTodo -> Response<Todo> {
+  let item = todos.insert({ title: request.body.title, done: false })
+  return response(status: 201, body: item)
+}
+```
+
+`Response<T>` supports `status`, optional `headers`, and `body`. v0.4 does not support streaming, cookies, middleware, or auth.
+
+### `fixture`
+
+Fixtures seed stores before each inline test:
+
+```sl
+fixture todos {
+  { title: "Buy milk", done: false }
+}
+```
+
+Each executable test runs against a fresh in-memory SQLite database. Fixtures are app-only and must reference an existing store.
 
 ### `test`
 
@@ -137,6 +192,16 @@ test "add creates todo" {
   assert item.done == false
 }
 ```
+
+Golden tests compare returned values against a file:
+
+```sl
+test "list output" golden "./golden/list.json" {
+  return list()
+}
+```
+
+On mismatch, generated tests write an `.actual` file next to the golden file.
 
 External IntentSpec tests are declared with:
 
@@ -156,7 +221,7 @@ expr
 
 ## Expressions
 
-v0.2 supports:
+v0.4 supports:
 
 - text, number, and boolean literals,
 - variable references,
@@ -168,6 +233,9 @@ v0.2 supports:
 - comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`,
 - boolean operators: `&&`, `||`,
 - wrapper constructors: `some(value)`, `none()`, `ok(value)`, `err(value)`.
+- app-kit built-ins: `response`, `env`, `env_int`, `uuid`, `now`, `read_text`, and `write_text`.
+
+`read_text` may be used in commands, routes, and tests. `write_text` may be used only in commands and tests.
 
 ## CLI
 
@@ -177,6 +245,7 @@ slc check <path> --json
 slc check <path> --no-cache
 slc build <path> --out build/app.py
 slc build <path> --out build/app.py --no-source-map
+slc schema <path> --out build/schema.json
 slc run <path> -- <generated-app-args>
 slc test <path>
 slc fmt <path>
@@ -186,9 +255,11 @@ slc new api <name>
 slc add route GET /items <path>
 ```
 
-`slc fmt` is intentionally conservative in v0.3. It refuses to rewrite files containing `//` comments because the formatter does not yet have comment-preserving trivia support.
+`slc fmt` is intentionally conservative in v0.4. It refuses to rewrite files containing `//` comments because the formatter does not yet have comment-preserving trivia support.
 
 `slc check --json` emits a machine-readable diagnostics array with `severity`, `code`, `message`, `file`, `line`, `column`, and `suggestion`.
+
+`slc schema` emits deterministic JSON schema metadata for records, enums, route bodies, and route responses. It does not depend on generated Python.
 
 ## Generated Python Contract
 

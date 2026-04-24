@@ -6,6 +6,13 @@ SymbolicLight is a spec-native, AI-friendly application language.
 
 The v0 compiler translates `.sl` applications into readable Python 3.11. The first product proof is a Todo API + CLI app with SQLite storage, JSON HTTP routes, CLI commands, and lightweight tests.
 
+Naming convention:
+
+- SymbolicLight is the formal project and brand name.
+- SL is the developer-facing language name.
+- `slc` is the compiler command.
+- `.sl` is the source file extension.
+
 ## Communication
 
 - 默认使用简体中文进行解释、进度说明、代码讲解和报错分析。
@@ -18,8 +25,9 @@ The v0 compiler translates `.sl` applications into readable Python 3.11. The fir
 - `src/symboliclight/parser.py` builds the AST.
 - `src/symboliclight/checker.py` validates v0 semantics.
 - `src/symboliclight/codegen.py` emits single-file Python apps.
+- `src/symboliclight/schema.py` emits JSON schema metadata for `.sl` apps.
 - `src/symboliclight/formatter.py` defines the official formatter.
-- `src/symboliclight/cli.py` provides `slc check/build/run/test/fmt/doctor/init/new/add`.
+- `src/symboliclight/cli.py` provides `slc check/build/schema/run/test/fmt/doctor/init/new/add`.
 - `examples/todo_app.sl` is the smoke-test app.
 - `examples/issue_tracker.sl` covers imports, modules, enums, and `Option<T>`.
 
@@ -36,10 +44,14 @@ Supported:
 - `enum`
 - `type`
 - `store`
+- `config`
+- `fixture`
 - `fn`
 - `command`
 - `route`
+- typed route bodies with `body TypeName`
 - `test`
+- golden tests
 - `let`
 - `return`
 - `assert`
@@ -47,6 +59,8 @@ Supported:
 - record and list literals
 - field access and function calls
 - `Option<T>` and `Result<T, E>` type references
+- `Response<T>` route responses
+- thin builtins: `response`, `env`, `env_int`, `uuid`, `now`, `read_text`, `write_text`
 - imported module `fn` calls
 
 Out of scope:

@@ -36,15 +36,25 @@ Deferred to later releases:
 
 ## v0.4 Standard App Kit
 
-Target standard capabilities:
+Implemented in the current mainline:
 
-- typed `Request<T>` and `Response<T>`,
-- richer SQLite helpers and migration metadata,
-- JSON schema generation,
+- typed route bodies and `Response<T>`,
+- SQLite helpers: `count`, `exists`, and test-only `clear`,
+- generated schema metadata and schema drift warnings,
+- `slc schema` JSON schema generation,
 - fixtures and golden tests,
-- typed config and `.env`,
-- thin `time`, `uuid`, `path`, and `file` standard wrappers,
-- `slc doctor` checks for IntentSpec routes, commands, permissions, and acceptance coverage.
+- typed config with `env` and `env_int`,
+- thin `uuid`, `now`, `read_text`, and `write_text` built-ins,
+- `slc doctor` route schema status,
+- Notes API example.
+
+Deferred to later releases:
+
+- automatic database migrations,
+- Postgres support,
+- full IntentSpec route, command, and permission diffing,
+- auth middleware,
+- comment-preserving formatter trivia.
 
 ## v0.5 Public Developer Preview
 

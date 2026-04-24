@@ -1,8 +1,13 @@
 from pathlib import Path
+import json
 import os
 import py_compile
+import socket
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 
 from symboliclight.codegen import generate_python, generate_python_artifact
 from symboliclight.checker import check_program
@@ -203,3 +208,161 @@ app Failing {
 
     assert completed.returncode != 0
     assert f"SL source: {app_path}:3:1" in completed.stderr
+
+
+def test_generated_http_handles_typed_body_response_and_bad_json(tmp_path: Path) -> None:
+    source = """
+app HttpBody {
+  type CreateTodo = {
+    title: Text,
+  }
+
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+    done: Bool,
+  }
+
+  store todos: Todo
+
+  route POST "/todos" body CreateTodo -> Response<Todo> {
+    let item = todos.insert({ title: request.body.title, done: false })
+    return response(status: 201, body: item)
+  }
+}
+"""
+    app_path = tmp_path / "http_body.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    diagnostics = check_program(app, source_path=app_path)
+    output = tmp_path / "http_body.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+    db_path = tmp_path / "http.sqlite"
+    port = free_port()
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    server = subprocess.Popen(
+        [sys.executable, str(output), "serve", "--port", str(port)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env={**os.environ, "SL_DB": str(db_path)},
+    )
+    try:
+        wait_for_server(port)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/todos",
+            data=b'{"title": "Buy milk"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            assert response.status == 201
+            assert payload["title"] == "Buy milk"
+
+        bad_request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/todos",
+            data=b'{"title":',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(bad_request, timeout=5)
+            raise AssertionError("expected malformed JSON to fail")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            assert error_payload["error"] == "malformed JSON body"
+
+        missing_request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/todos",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(missing_request, timeout=5)
+            raise AssertionError("expected missing field to fail")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            assert error_payload["fields"] == ["title"]
+    finally:
+        server.terminate()
+        server.wait(timeout=10)
+
+
+def test_generated_tests_load_fixtures_and_check_golden(tmp_path: Path) -> None:
+    golden_dir = tmp_path / "golden"
+    golden_dir.mkdir()
+    (golden_dir / "todos.json").write_text(
+        """[
+  {
+    "done": false,
+    "id": 1,
+    "title": "Buy milk"
+  }
+]""",
+        encoding="utf-8",
+    )
+    source = """
+app Fixtures {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+    done: Bool,
+  }
+
+  store todos: Todo
+
+  fixture todos {
+    { title: "Buy milk", done: false }
+  }
+
+  test "fixture count" {
+    assert todos.count() == 1
+  }
+
+  test "golden list" golden "./golden/todos.json" {
+    return todos.all()
+  }
+}
+"""
+    app_path = tmp_path / "fixtures.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    diagnostics = check_program(app, source_path=app_path)
+    output = tmp_path / "fixtures.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    completed = subprocess.run(
+        [sys.executable, str(output), "test"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "ok - 2 test(s) passed" in completed.stdout
+    assert not (golden_dir / "todos.json.actual").exists()
+
+
+def free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def wait_for_server(port: int) -> None:
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/missing", timeout=0.2):
+                return
+        except urllib.error.HTTPError:
+            return
+        except OSError:
+            time.sleep(0.05)
+    raise AssertionError("server did not start")

@@ -4,6 +4,12 @@ SymbolicLight is a spec-native, AI-friendly application language.
 
 The language is built around one observation: AI can write code quickly, but real projects still need clear application structure, stable interfaces, tests, and readable generated artifacts.
 
+## Naming
+
+SymbolicLight is the formal project and brand name. SL is the developer-facing language name used in examples, tutorials, and everyday references.
+
+The compiler is `slc`, and source files use the `.sl` extension.
+
 SL should make application code:
 
 - easier for humans to review,

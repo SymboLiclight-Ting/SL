@@ -1,6 +1,6 @@
-# SymbolicLight v0.3 Semantics
+# SymbolicLight v0.4 Semantics
 
-SymbolicLight v0.3 is an application language that compiles to Python.
+SymbolicLight v0.4 is an application language that compiles to Python.
 
 ## Unit Boundary
 
@@ -22,6 +22,8 @@ Records and enums define the stable application data surface.
 `Result<T, E>` is reserved for explicit error-returning APIs. `ok(value)` produces `Result<typeof value, Unknown>` and `err(value)` produces `Result<Unknown, typeof value>`. Broader control-flow helpers are planned for later releases.
 
 Named arguments are checked against declared function and command parameters. Unknown, duplicate, and missing arguments are rejected. Positional arguments may not follow named arguments.
+
+`Response<T>` represents a JSON HTTP response wrapper. In v0.4 it carries status, optional headers, and body only.
 
 ## Function Boundary
 
@@ -46,11 +48,42 @@ Supported store methods:
 - `delete(id) -> Bool`
 - `filter(field: value) -> List<Item>`
 
-`insert` and `update` require record literals in v0.3. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
+`insert` and `update` require record literals in v0.4. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
 
 `get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
 
 `filter` requires named arguments and validates field value types.
+
+`count()` returns the number of rows in a store. `exists(id)` checks whether an item exists. `clear()` deletes all rows and is allowed only in `test` blocks.
+
+Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.4 does not automatically migrate data.
+
+## Request Body Semantics
+
+Routes may declare `body TypeName` for typed JSON request bodies. `GET` and `DELETE` routes may not declare a body in v0.4.
+
+When a route has a body type, `request.body.field` is checked against that record type. Generated Python returns `400` for malformed JSON and for missing required non-optional body fields.
+
+Routes without a declared body keep the v0.3 compatibility behavior where `request.body.field` is treated as `Text`.
+
+## Fixture And Golden Test Semantics
+
+Fixtures are app-level store seeds. Each inline test runs with a fresh in-memory SQLite database and loads fixtures before executing test statements.
+
+Golden tests compare a returned value with a file. If the value differs, generated Python writes an `.actual` file and fails the test with a path-aware message.
+
+## Config And Thin Stdlib Semantics
+
+Config declarations produce typed app config dictionaries. Defaults are checked against declared field types.
+
+Thin standard-library built-ins are mapped to Python stdlib:
+
+- `env` and `env_int` read environment variables,
+- `uuid` uses Python `uuid4`,
+- `now` uses UTC ISO timestamps,
+- `read_text` and `write_text` use UTF-8 text files.
+
+`read_text` is allowed from commands, routes, and tests. `write_text` is allowed only from commands and tests.
 
 ## Enum Semantics
 
@@ -92,6 +125,6 @@ Compiler diagnostics carry a stable shape for tools and AI repair loops:
 
 ## Formatting Boundary
 
-The v0.3 formatter is the official style source for comment-free `.sl` files.
+The v0.4 formatter is the official style source for comment-free `.sl` files.
 
-Files containing `//` comments are not rewritten in v0.3. The formatter exits with an error instead of deleting comments, because comment-preserving formatting requires lexer trivia support.
+Files containing `//` comments are not rewritten in v0.4. The formatter exits with an error instead of deleting comments, because comment-preserving formatting requires lexer trivia support.

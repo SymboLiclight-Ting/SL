@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
+from pathlib import Path
 
 from symboliclight.ast import (
     App,
@@ -54,14 +56,18 @@ class PythonGenerator:
             "from __future__ import annotations",
             "",
             "import argparse",
+            "import datetime as _sl_datetime",
             "import json",
             "import os",
             "import sqlite3",
             "import sys",
             "import traceback",
+            "import uuid as _sl_uuid",
             "from http.server import BaseHTTPRequestHandler, HTTPServer",
             "",
             "SL_LINE_MAP = {}",
+            "SL_SCHEMA_VERSION = 1",
+            f"SL_SCHEMA_HASH = {self.schema_hash()!r}",
             "",
             "def sl_report_exception():",
             "    _, _, tb = sys.exc_info()",
@@ -91,6 +97,33 @@ class PythonGenerator:
             "def print_json(value):",
             "    print(json.dumps(json_ready(value), ensure_ascii=False, indent=2))",
             "",
+            "def response(status, body, headers=None):",
+            "    return {'__sl_response__': True, 'status': status, 'headers': headers or {}, 'body': body}",
+            "",
+            "def env(name, default):",
+            "    return os.environ.get(name, default)",
+            "",
+            "def env_int(name, default):",
+            "    try:",
+            "        return int(os.environ.get(name, default))",
+            "    except ValueError:",
+            "        return default",
+            "",
+            "def uuid():",
+            "    return str(_sl_uuid.uuid4())",
+            "",
+            "def now():",
+            "    return _sl_datetime.datetime.now(_sl_datetime.UTC).isoformat()",
+            "",
+            "def read_text(path):",
+            "    with open(path, 'r', encoding='utf-8') as handle:",
+            "        return handle.read()",
+            "",
+            "def write_text(path, content):",
+            "    with open(path, 'w', encoding='utf-8') as handle:",
+            "        handle.write(content)",
+            "    return True",
+            "",
             "def some(value):",
             "    return value",
             "",
@@ -104,7 +137,9 @@ class PythonGenerator:
             "    return {'err': value}",
             "",
         ]
+        lines.extend(self.emit_configs())
         lines.extend(self.emit_init_db())
+        lines.extend(self.emit_fixtures())
         lines.extend(self.emit_imported_functions())
         for function in self.app.functions:
             lines.extend(self.emit_function(function))
@@ -124,8 +159,15 @@ class PythonGenerator:
 
     def emit_init_db(self) -> list[str]:
         lines = ["def init_db():", "    database = conn()"]
+        lines.extend([
+            "    database.execute('CREATE TABLE IF NOT EXISTS sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)')",
+            "    row = database.execute('SELECT schema_hash FROM sl_migrations WHERE version = ?', [SL_SCHEMA_VERSION]).fetchone()",
+            "    if row and row['schema_hash'] != SL_SCHEMA_HASH:",
+            "        print('warning: SymbolicLight schema drift detected; automatic migrations are not implemented in v0.4', file=sys.stderr)",
+            "    database.execute('INSERT OR REPLACE INTO sl_migrations (version, schema_hash) VALUES (?, ?)', [SL_SCHEMA_VERSION, SL_SCHEMA_HASH])",
+        ])
         if not self.app.stores:
-            lines.append("    return")
+            lines.extend(["    database.commit()", "    return"])
         for store in self.app.stores:
             type_decl = self.type_decl(store.type_ref.name)
             columns = []
@@ -139,6 +181,16 @@ class PythonGenerator:
         lines.extend(["    database.commit()", ""])
         for store in self.app.stores:
             lines.extend(self.emit_store_helpers(store.name, self.type_decl(store.type_ref.name)))
+        return lines
+
+    def emit_configs(self) -> list[str]:
+        lines: list[str] = []
+        for config in self.app.configs:
+            lines.append(f"{config.name} = {{")
+            for field in config.fields:
+                lines.append(f"    {field.name!r}: {self.expr(field.default)},")
+            lines.append("}")
+            lines.append("")
         return lines
 
     def emit_store_helpers(self, store_name: str, type_decl: TypeDecl) -> list[str]:
@@ -197,7 +249,32 @@ class PythonGenerator:
             f"    rows = conn().execute('SELECT * FROM {store_name} WHERE ' + where + ' ORDER BY id', list(criteria.values())).fetchall()",
             f"    return [{store_name}_normalize(dict(row)) for row in rows]",
             "",
+            f"def {store_name}_count():",
+            f"    row = conn().execute('SELECT COUNT(*) AS count FROM {store_name}').fetchone()",
+            "    return int(row['count'])",
+            "",
+            f"def {store_name}_exists(item_id):",
+            f"    row = conn().execute('SELECT 1 FROM {store_name} WHERE id = ?', [item_id]).fetchone()",
+            "    return row is not None",
+            "",
+            f"def {store_name}_clear():",
+            f"    cursor = conn().execute('DELETE FROM {store_name}')",
+            "    conn().commit()",
+            "    return cursor.rowcount",
+            "",
         ])
+        return lines
+
+    def emit_fixtures(self) -> list[str]:
+        lines = ["def load_fixtures():"]
+        if not self.app.fixtures:
+            lines.append("    return")
+            lines.append("")
+            return lines
+        for fixture in self.app.fixtures:
+            for record in fixture.records:
+                lines.append(f"    {fixture.store_name}_insert({self.expr(record)})")
+        lines.append("")
         return lines
 
     def emit_imported_functions(self) -> list[str]:
@@ -242,32 +319,43 @@ class PythonGenerator:
         lines.append("")
         return lines
 
-    def emit_body(self, statements: list[Stmt], *, indent: str) -> list[str]:
+    def emit_body(self, statements: list[Stmt], *, indent: str, return_target: str | None = None) -> list[str]:
         lines: list[str] = []
         for stmt in statements:
             if isinstance(stmt, LetStmt):
                 lines.append(f"{indent}{stmt.name} = {self.expr(stmt.expr)}")
             elif isinstance(stmt, ReturnStmt):
-                lines.append(f"{indent}return {self.expr(stmt.expr)}")
+                if return_target is None:
+                    lines.append(f"{indent}return {self.expr(stmt.expr)}")
+                else:
+                    lines.append(f"{indent}{return_target} = {self.expr(stmt.expr)}")
             elif isinstance(stmt, AssertStmt):
                 lines.append(f"{indent}assert {self.expr(stmt.expr)}")
             elif isinstance(stmt, IfStmt):
                 lines.append(f"{indent}if {self.expr(stmt.condition)}:")
-                lines.extend(self.emit_body(stmt.then_body, indent=indent + "    ") or [indent + "    pass"])
+                lines.extend(
+                    self.emit_body(stmt.then_body, indent=indent + "    ", return_target=return_target)
+                    or [indent + "    pass"]
+                )
                 if stmt.else_body:
                     lines.append(f"{indent}else:")
-                    lines.extend(self.emit_body(stmt.else_body, indent=indent + "    "))
+                    lines.extend(self.emit_body(stmt.else_body, indent=indent + "    ", return_target=return_target))
             else:
                 lines.append(f"{indent}{self.expr(stmt.expr)}")
         return lines
 
     def emit_server(self) -> list[str]:
         route_entries = []
+        body_entries = []
         for route in self.app.routes:
             route_entries.append(f"    ({route.method!r}, {route.path!r}): {route.function_name},")
+            body_entries.append(f"    ({route.method!r}, {route.path!r}): {self.required_body_fields(route)!r},")
         return [
             "ROUTES = {",
             *route_entries,
+            "}",
+            "ROUTE_BODY_FIELDS = {",
+            *body_entries,
             "}",
             "",
             "class Request:",
@@ -299,10 +387,27 @@ class PythonGenerator:
             "            return",
             "        length = int(self.headers.get('Content-Length', '0'))",
             "        raw = self.rfile.read(length).decode('utf-8') if length else '{}'",
-            "        body = json.loads(raw or '{}')",
+            "        try:",
+            "            body = json.loads(raw or '{}')",
+            "        except json.JSONDecodeError:",
+            "            self.send_json(400, {'error': 'malformed JSON body'})",
+            "            return",
+            "        required = ROUTE_BODY_FIELDS.get((method, self.path), [])",
+            "        missing = [field for field in required if field not in body or body[field] is None]",
+            "        if missing:",
+            "            self.send_json(400, {'error': 'missing required body field', 'fields': missing})",
+            "            return",
             "        result = handler(Request(body))",
-            "        payload = json.dumps(result, ensure_ascii=False).encode('utf-8')",
-            "        self.send_response(200)",
+            "        if isinstance(result, dict) and result.get('__sl_response__'):",
+            "            self.send_json(result.get('status', 200), result.get('body'), result.get('headers', {}))",
+            "            return",
+            "        self.send_json(200, result)",
+            "",
+            "    def send_json(self, status, value, headers=None):",
+            "        payload = json.dumps(value, ensure_ascii=False).encode('utf-8')",
+            "        self.send_response(status)",
+            "        for key, header_value in (headers or {}).items():",
+            "            self.send_header(key, header_value)",
             "        self.send_header('Content-Type', 'application/json; charset=utf-8')",
             "        self.send_header('Content-Length', str(len(payload)))",
             "        self.end_headers()",
@@ -317,7 +422,24 @@ class PythonGenerator:
         ]
 
     def emit_tests(self) -> list[str]:
-        lines = ["def run_tests():", "    connect(':memory:')"]
+        lines = [
+            "def assert_golden(value, expected_path):",
+            "    actual = json.dumps(json_ready(value), ensure_ascii=False, indent=2, sort_keys=True).strip()",
+            "    actual_path = expected_path + '.actual'",
+            "    try:",
+            "        with open(expected_path, 'r', encoding='utf-8') as handle:",
+            "            expected = handle.read().strip()",
+            "    except FileNotFoundError:",
+            "        with open(actual_path, 'w', encoding='utf-8') as handle:",
+            "            handle.write(actual + '\\n')",
+            "        raise AssertionError(f'golden file not found: {expected_path}; actual written to {actual_path}')",
+            "    if actual != expected:",
+            "        with open(actual_path, 'w', encoding='utf-8') as handle:",
+            "            handle.write(actual + '\\n')",
+            "        raise AssertionError(f'golden mismatch: expected {expected_path}, actual {actual_path}')",
+            "",
+            "def run_tests():",
+        ]
         if not self.app.tests:
             lines.append("    print('No tests defined.')")
             return lines + [""]
@@ -330,7 +452,12 @@ class PythonGenerator:
             executable_tests += 1
             lines.append(f"    # {test.name}")
             lines.append("    try:")
-            lines.extend(self.emit_body(test.body, indent="        "))
+            lines.append("        connect(':memory:')")
+            lines.append("        load_fixtures()")
+            lines.append("        __sl_test_value = None")
+            lines.extend(self.emit_body(test.body, indent="        ", return_target="__sl_test_value"))
+            if test.golden_path is not None:
+                lines.append(f"        assert_golden(__sl_test_value, {self.resolve_source_path(test.location.path, test.golden_path)!r})")
             lines.append("    except Exception:")
             lines.append("        sl_report_exception()")
             lines.append("        raise")
@@ -454,6 +581,30 @@ class PythonGenerator:
         if type_ref.name == "Float":
             return "REAL"
         return "TEXT"
+
+    def required_body_fields(self, route: RouteDecl) -> list[str]:
+        if route.body_type is None:
+            return []
+        type_decl = self.type_decl(route.body_type.name)
+        return [
+            field.name
+            for field in type_decl.fields
+            if field.name != "id" and field.type_ref.name != "Option"
+        ]
+
+    def schema_hash(self) -> str:
+        digest = hashlib.sha256()
+        for store in self.app.stores:
+            type_decl = self.type_decl(store.type_ref.name)
+            digest.update(store.name.encode("utf-8"))
+            for field in type_decl.fields:
+                digest.update(field.name.encode("utf-8"))
+                digest.update(field.type_ref.render().encode("utf-8"))
+        return digest.hexdigest()
+
+    def resolve_source_path(self, source_path: str, relative_path: str) -> str:
+        source = Path(source_path)
+        return str((source.parent / relative_path).resolve())
 
     def type_decl(self, name: str) -> TypeDecl:
         for type_decl in self.app.types:

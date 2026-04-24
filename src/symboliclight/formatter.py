@@ -5,9 +5,11 @@ from symboliclight.ast import (
     AssertStmt,
     BinaryExpr,
     CallExpr,
+    ConfigDecl,
     Expr,
     ExprStmt,
     FunctionDecl,
+    FixtureDecl,
     IfStmt,
     LetStmt,
     ListExpr,
@@ -49,6 +51,8 @@ class Formatter:
         groups.extend([self.enum_decl(enum.name, enum.variants, indent="  ") for enum in app.enums])
         groups.extend([self.type_decl(type_decl.name, type_decl.fields, indent="  ") for type_decl in app.types])
         groups.extend([[f"  store {store.name}: {store.type_ref.render()}"] for store in app.stores])
+        groups.extend([self.config(config, indent="  ") for config in app.configs])
+        groups.extend([self.fixture(fixture, indent="  ") for fixture in app.fixtures])
         groups.extend([self.function(function, indent="  ") for function in app.functions])
         groups.extend([self.route(route, indent="  ") for route in app.routes])
         groups.extend([self.test(test, indent="  ") for test in app.tests])
@@ -80,15 +84,31 @@ class Formatter:
         return lines
 
     def route(self, route: RouteDecl, *, indent: str) -> list[str]:
-        lines = [f'{indent}route {route.method} "{route.path}" -> {route.return_type.render()} {{']
+        body = f" body {route.body_type.render()}" if route.body_type is not None else ""
+        lines = [f'{indent}route {route.method} "{route.path}"{body} -> {route.return_type.render()} {{']
         lines.extend(self.block(route.body, indent=indent + "  "))
+        lines.append(f"{indent}}}")
+        return lines
+
+    def config(self, config: ConfigDecl, *, indent: str) -> list[str]:
+        lines = [f"{indent}config {config.name} = {{"]
+        for field in config.fields:
+            lines.append(f"{indent}  {field.name}: {field.type_ref.render()} = {self.expr(field.default)},")
+        lines.append(f"{indent}}}")
+        return lines
+
+    def fixture(self, fixture: FixtureDecl, *, indent: str) -> list[str]:
+        lines = [f"{indent}fixture {fixture.store_name} {{"]
+        for record in fixture.records:
+            lines.append(f"{indent}  {self.expr(record)},")
         lines.append(f"{indent}}}")
         return lines
 
     def test(self, test: TestDecl, *, indent: str) -> list[str]:
         if test.external_ref is not None:
             return [f"{indent}test from {test.external_ref}"]
-        lines = [f'{indent}test "{test.name}" {{']
+        golden = f' golden "{test.golden_path}"' if test.golden_path is not None else ""
+        lines = [f'{indent}test "{test.name}"{golden} {{']
         lines.extend(self.block(test.body, indent=indent + "  "))
         lines.append(f"{indent}}}")
         return lines

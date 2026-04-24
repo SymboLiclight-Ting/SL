@@ -9,9 +9,11 @@ from symboliclight.ast import (
     AssertStmt,
     BinaryExpr,
     CallExpr,
+    ConfigDecl,
     EnumDecl,
     Expr,
     FieldDecl,
+    FixtureDecl,
     FunctionDecl,
     IfStmt,
     LetStmt,
@@ -33,7 +35,7 @@ from symboliclight.parser import parse_source
 
 PRIMITIVES = {"Bool", "Int", "Float", "Text"}
 GENERIC_ARITY = {"Id": 1, "List": 1, "Option": 1, "Result": 2}
-STORE_METHODS = {"insert", "all", "get", "update", "delete", "filter"}
+STORE_METHODS = {"insert", "all", "get", "update", "delete", "filter", "count", "exists", "clear"}
 
 
 @dataclass(slots=True)
@@ -69,6 +71,7 @@ class Checker:
         self.types = {type_decl.name: type_decl for type_decl in unit.types}
         self.enums = {enum_decl.name: enum_decl for enum_decl in unit.enums}
         self.functions = {function.name: function for function in unit.functions}
+        self.configs = {config.name: config for config in unit.configs} if isinstance(unit, App) else {}
         self.imported_functions: dict[str, FunctionDecl] = {}
 
         if isinstance(unit, App):
@@ -98,6 +101,10 @@ class Checker:
                         store.location,
                         "Declare a record type and use it as the store item type.",
                     )
+            for config in self.unit.configs:
+                self.check_config(config)
+            for fixture in self.unit.fixtures:
+                self.check_fixture(fixture)
             for function in self.unit.functions:
                 self.check_function(function)
             for route in self.unit.routes:
@@ -205,6 +212,8 @@ class Checker:
         names.update(function.name for function in self.unit.functions)
         if isinstance(self.unit, App):
             names.update(store.name for store in self.unit.stores)
+            names.update(config.name for config in self.unit.configs)
+            names.update(fixture.store_name for fixture in self.unit.fixtures)
         return names
 
     def symbol_table(self) -> dict[str, str]:
@@ -220,6 +229,8 @@ class Checker:
         if isinstance(self.unit, App):
             for store in self.unit.stores:
                 symbols[store.name] = "store"
+            for config in self.unit.configs:
+                symbols[config.name] = "config"
         return symbols
 
     def qualify_type_decl(self, type_decl: TypeDecl, alias: str, module: Module) -> TypeDecl:
@@ -267,6 +278,10 @@ class Checker:
                 if store.name in names:
                     self.error(f"Duplicate declaration `{store.name}`.", store.location, "Use unique names in one app.")
                 names.add(store.name)
+            for config in self.unit.configs:
+                if config.name in names:
+                    self.error(f"Duplicate declaration `{config.name}`.", config.location, "Use unique names in one app.")
+                names.add(config.name)
 
     def check_intents(self) -> None:
         assert isinstance(self.unit, App)
@@ -306,7 +321,7 @@ class Checker:
                 self.error(
                     f"Unsupported permissions source `{source}`.",
                     self.unit.location,
-                    "Use `permissions from intent.permissions` in v0.2.",
+                    "Use `permissions from intent.permissions` in v0.4.",
                 )
             if not self.unit.intents:
                 self.error(
@@ -323,7 +338,7 @@ class Checker:
             self.error(
                 f"Unsupported external test source `{external_ref}`.",
                 location,
-                "Use `test from intent.acceptance` in v0.2.",
+                "Use `test from intent.acceptance` in v0.4.",
             )
             return
         if not self.unit.intents:
@@ -364,8 +379,24 @@ class Checker:
             self.error(
                 f"Unsupported route method `{route.method}`.",
                 route.location,
-                "Use GET, POST, PUT, PATCH, or DELETE in v0.2.",
+                "Use GET, POST, PUT, PATCH, or DELETE in v0.4.",
             )
+        if route.method in {"GET", "DELETE"} and route.body_type is not None:
+            self.error(
+                f"{route.method} routes cannot declare a request body in v0.4.",
+                route.location,
+                f"Remove `body Type` from the {route.method} route.",
+                code="SLC060",
+            )
+        if route.body_type is not None:
+            self.check_type_ref(route.body_type, route.location)
+            if route.body_type.name not in self.types:
+                self.error(
+                    f"Route body type `{route.body_type.render()}` must be a record type.",
+                    route.location,
+                    "Declare a record type and use it as the route body.",
+                    code="SLC061",
+                )
         self.check_type_ref(route.return_type, route.location)
         if not self.is_json_encodable(route.return_type):
             self.error(
@@ -374,8 +405,39 @@ class Checker:
                 "Return a primitive, enum, record, Option, Result, or List of JSON encodable values.",
                 code="SLC040",
             )
-        env = {"request": TypeRef("Request")}
+        env = {"request": TypeRef("Request", [route.body_type] if route.body_type is not None else [])}
         self.check_block(route.body, expected_return=route.return_type, local_env=env, context_kind="route")
+
+    def check_config(self, config: ConfigDecl) -> None:
+        names: set[str] = set()
+        env: dict[str, TypeRef] = {}
+        for field in config.fields:
+            if field.name in names:
+                self.error(f"Duplicate config field `{field.name}`.", field.location, "Use unique config field names.")
+            names.add(field.name)
+            self.check_type_ref(field.type_ref, field.location)
+            actual = self.infer_expr(field.default, env, context_kind="config")
+            if not self.type_matches(field.type_ref, actual):
+                self.error(
+                    f"Config field `{field.name}` expected `{field.type_ref.render()}`, found `{actual.render()}`.",
+                    field.location,
+                    "Use a default expression matching the declared config field type.",
+                    code="SLC070",
+                )
+            env[field.name] = field.type_ref
+
+    def check_fixture(self, fixture: FixtureDecl) -> None:
+        store = self.stores.get(fixture.store_name)
+        if store is None:
+            self.error(
+                f"Fixture references unknown store `{fixture.store_name}`.",
+                fixture.location,
+                "Use a declared store name after `fixture`.",
+                code="SLC080",
+            )
+            return
+        for record in fixture.records:
+            self.validate_record_expr(record, store.type_ref, allow_missing_id=True, env={})
 
     def check_block(
         self,
@@ -391,7 +453,7 @@ class Checker:
             env = dict(local_env)
             for statement in statements:
                 if isinstance(statement, LetStmt):
-                    env[statement.name] = self.infer_expr(statement.expr, env)
+                    env[statement.name] = self.infer_expr(statement.expr, env, context_kind=context_kind)
                 elif isinstance(statement, ReturnStmt):
                     if expected_return is not None and isinstance(statement.expr, RecordExpr):
                         self.validate_record_expr(
@@ -400,7 +462,7 @@ class Checker:
                             allow_missing_id=False,
                             env=env,
                         )
-                    actual = self.infer_expr(statement.expr, env)
+                    actual = self.infer_expr(statement.expr, env, context_kind=context_kind)
                     if expected_return is not None and not self.type_matches(expected_return, actual):
                         self.error(
                             f"Return type mismatch: expected `{expected_return.render()}`, found `{actual.render()}`.",
@@ -408,11 +470,11 @@ class Checker:
                             "Return a value that matches the declared type.",
                         )
                 elif isinstance(statement, AssertStmt):
-                    actual = self.infer_expr(statement.expr, env)
+                    actual = self.infer_expr(statement.expr, env, context_kind=context_kind)
                     if actual.name != "Bool":
                         self.error("assert requires Bool.", statement.location, "Compare values or return a Bool.")
                 elif isinstance(statement, IfStmt):
-                    actual = self.infer_expr(statement.condition, env)
+                    actual = self.infer_expr(statement.condition, env, context_kind=context_kind)
                     if actual.name != "Bool":
                         self.error("if condition requires Bool.", statement.location, "Use a boolean expression.")
                     self.check_block(
@@ -428,11 +490,11 @@ class Checker:
                         context_kind=context_kind,
                     )
                 else:
-                    self.infer_expr(statement.expr, env)
+                    self.infer_expr(statement.expr, env, context_kind=context_kind)
         finally:
             self.context_kind = previous_context
 
-    def infer_expr(self, expr: Expr, env: dict[str, TypeRef]) -> TypeRef:
+    def infer_expr(self, expr: Expr, env: dict[str, TypeRef], *, context_kind: str | None = None) -> TypeRef:
         if isinstance(expr, LiteralExpr):
             if expr.value is None:
                 return TypeRef("Unknown")
@@ -446,9 +508,9 @@ class Checker:
         if isinstance(expr, ListExpr):
             if not expr.items:
                 return TypeRef("List", [TypeRef("Unknown")])
-            first = self.infer_expr(expr.items[0], env)
+            first = self.infer_expr(expr.items[0], env, context_kind=context_kind)
             for item in expr.items[1:]:
-                actual = self.infer_expr(item, env)
+                actual = self.infer_expr(item, env, context_kind=context_kind)
                 if not self.type_matches(first, actual):
                     self.error(
                         f"List item type mismatch: expected `{first.render()}`, found `{actual.render()}`.",
@@ -459,13 +521,13 @@ class Checker:
         if isinstance(expr, RecordExpr):
             return TypeRef("RecordLiteral")
         if isinstance(expr, BinaryExpr):
-            self.infer_expr(expr.left, env)
-            self.infer_expr(expr.right, env)
+            self.infer_expr(expr.left, env, context_kind=context_kind)
+            self.infer_expr(expr.right, env, context_kind=context_kind)
             return TypeRef("Bool")
         if isinstance(expr, PathExpr):
             return self.infer_path(expr.parts, env, expr.location)
         if isinstance(expr, CallExpr):
-            return self.infer_call(expr, env)
+            return self.infer_call(expr, env, context_kind=context_kind)
         return TypeRef("Unknown")
 
     def infer_path(
@@ -474,11 +536,47 @@ class Checker:
         enum_type = self.enum_variant_type(parts, location)
         if enum_type is not None:
             return enum_type
-        if len(parts) == 3 and parts[0] == "request" and parts[1] == "body":
-            return TypeRef("Text")
         if not parts:
             return TypeRef("Unknown")
         root = env.get(parts[0])
+        if parts[0] == "request" and len(parts) >= 2 and parts[1] == "body":
+            request_type = root or TypeRef("Request")
+            body_type = request_type.args[0] if request_type.args else None
+            if len(parts) == 2:
+                return body_type or TypeRef("Unknown")
+            if body_type is None:
+                return TypeRef("Text")
+            current = body_type
+            for field in parts[2:]:
+                record = self.types.get(current.name)
+                if record is None:
+                    return TypeRef("Unknown")
+                match = next((decl for decl in record.fields if decl.name == field), None)
+                if match is None:
+                    self.error(
+                        f"Type `{current.render()}` has no field `{field}`.",
+                        location,
+                        "Check the route body record declaration.",
+                        code="SLC062",
+                    )
+                    return TypeRef("Unknown")
+                current = match.type_ref
+            return current
+        if parts[0] in self.configs:
+            config = self.configs[parts[0]]
+            if len(parts) == 1:
+                return TypeRef(config.name)
+            current_fields = {field.name: field.type_ref for field in config.fields}
+            field_type = current_fields.get(parts[1])
+            if field_type is None:
+                self.error(
+                    f"Config `{config.name}` has no field `{parts[1]}`.",
+                    location,
+                    "Check the config declaration.",
+                    code="SLC071",
+                )
+                return TypeRef("Unknown")
+            return field_type
         if root is None:
             if parts[0] in self.unit.imported_modules:
                 self.error(
@@ -506,12 +604,22 @@ class Checker:
             current = match.type_ref
         return current
 
-    def infer_call(self, expr: CallExpr, env: dict[str, TypeRef]) -> TypeRef:
+    def infer_call(self, expr: CallExpr, env: dict[str, TypeRef], *, context_kind: str | None = None) -> TypeRef:
         name = ".".join(expr.callee)
         if len(expr.callee) == 2 and expr.callee[0] in self.stores:
             return self.infer_store_call(expr, env)
         if len(expr.callee) == 1 and expr.callee[0] in {"some", "none", "ok", "err"}:
             return self.infer_wrapper_constructor(expr, env)
+        if len(expr.callee) == 1 and expr.callee[0] in {
+            "response",
+            "env",
+            "env_int",
+            "uuid",
+            "now",
+            "read_text",
+            "write_text",
+        }:
+            return self.infer_builtin_call(expr, env, context_kind=context_kind or self.context_kind)
         function = self.functions.get(name) or self.imported_functions.get(name)
         if function is not None:
             if function.kind == "command" and self.context_kind != "test":
@@ -522,7 +630,7 @@ class Checker:
                 )
             ordered_args = self.bind_call_args(expr, function)
             for arg, param in ordered_args:
-                actual = self.infer_expr(arg.expr, env)
+                actual = self.infer_expr(arg.expr, env, context_kind=context_kind)
                 if not self.type_matches(param.type_ref, actual):
                     self.error(
                         f"Argument `{param.name}` expected `{param.type_ref.render()}`, found `{actual.render()}`.",
@@ -619,7 +727,7 @@ class Checker:
             self.error(
                 f"Unknown store method `{'.'.join(expr.callee)}`.",
                 expr.location,
-                "Use insert, all, get, update, delete, or filter.",
+                "Use insert, all, get, update, delete, filter, count, exists, or clear.",
             )
             return TypeRef("Unknown")
         if method != "filter":
@@ -638,7 +746,7 @@ class Checker:
                     self.validate_record_expr(expr.args[0].expr, item_type, allow_missing_id=True, env=env)
                 else:
                     self.error(
-                        "Store insert requires a record literal in v0.2.",
+                        "Store insert requires a record literal in v0.4.",
                         expr.args[0].location,
                         "Use `items.insert({ field: value })`.",
                     )
@@ -646,10 +754,17 @@ class Checker:
         if method == "all":
             self.expect_arg_count(expr, 0)
             return TypeRef("List", [item_type])
+        if method == "count":
+            self.expect_arg_count(expr, 0)
+            return TypeRef("Int")
         if method == "get":
             self.expect_arg_count(expr, 1)
             self.check_store_id_arg(expr, env, item_type)
             return TypeRef("Option", [item_type])
+        if method == "exists":
+            self.expect_arg_count(expr, 1)
+            self.check_store_id_arg(expr, env, item_type)
+            return TypeRef("Bool")
         if method == "update":
             self.expect_arg_count(expr, 2)
             self.check_store_id_arg(expr, env, item_type)
@@ -658,7 +773,7 @@ class Checker:
                     self.validate_record_expr(expr.args[1].expr, item_type, allow_missing_id=True, env=env)
                 else:
                     self.error(
-                        "Store update requires a record literal in v0.2.",
+                        "Store update requires a record literal in v0.4.",
                         expr.args[1].location,
                         "Use `items.update(id, { field: value })`.",
                     )
@@ -667,6 +782,16 @@ class Checker:
             self.expect_arg_count(expr, 1)
             self.check_store_id_arg(expr, env, item_type)
             return TypeRef("Bool")
+        if method == "clear":
+            self.expect_arg_count(expr, 0)
+            if self.context_kind != "test":
+                self.error(
+                    f"Store method `{'.'.join(expr.callee)}` is only allowed in tests.",
+                    expr.location,
+                    "Use `clear()` only from test blocks.",
+                    code="SLC051",
+                )
+            return TypeRef("Int")
         if method == "filter":
             record = self.types.get(item_type.name)
             fields = {field.name: field for field in record.fields} if record else {}
@@ -684,7 +809,7 @@ class Checker:
                         "Filter by a declared record field.",
                     )
                 else:
-                    actual = self.infer_expr(arg.expr, env)
+                    actual = self.infer_expr(arg.expr, env, context_kind=self.context_kind)
                     expected = fields[arg.name].type_ref
                     if not self.type_matches(expected, actual):
                         self.error(
@@ -694,6 +819,160 @@ class Checker:
                         )
             return TypeRef("List", [item_type])
         return TypeRef("Unknown")
+
+    def infer_builtin_call(
+        self,
+        expr: CallExpr,
+        env: dict[str, TypeRef],
+        *,
+        context_kind: str,
+    ) -> TypeRef:
+        name = expr.callee[0]
+        if name == "response":
+            args = self.bind_builtin_args(expr, ["status", "body", "headers"], required=["status", "body"])
+            status_arg = args.get("status")
+            body_arg = args.get("body")
+            if status_arg is None or body_arg is None:
+                return TypeRef("Response", [TypeRef("Unknown")])
+            status_type = self.infer_expr(status_arg.expr, env, context_kind=context_kind)
+            if status_type.name != "Int":
+                self.error("response status requires Int.", status_arg.location, "Pass an integer HTTP status.")
+            body_type = self.infer_expr(body_arg.expr, env, context_kind=context_kind)
+            headers_arg = args.get("headers")
+            if headers_arg is not None:
+                if not isinstance(headers_arg.expr, RecordExpr):
+                    self.error("response headers require a record literal.", headers_arg.location, "Use `{ name: value }` headers.")
+                else:
+                    for field in headers_arg.expr.fields:
+                        header_type = self.infer_expr(field.expr, env, context_kind=context_kind)
+                        if header_type.name != "Text":
+                            self.error(
+                                f"response header `{field.name}` expected `Text`, found `{header_type.render()}`.",
+                                field.location,
+                                "Use text values for response headers.",
+                            )
+            return TypeRef("Response", [body_type])
+        if name == "env":
+            args = self.bind_builtin_args(expr, ["name", "default"], required=["name", "default"])
+            self.check_bound_arg_type(args, env, "name", TypeRef("Text"), context_kind)
+            self.check_bound_arg_type(args, env, "default", TypeRef("Text"), context_kind)
+            return TypeRef("Text")
+        if name == "env_int":
+            args = self.bind_builtin_args(expr, ["name", "default"], required=["name", "default"])
+            self.check_bound_arg_type(args, env, "name", TypeRef("Text"), context_kind)
+            self.check_bound_arg_type(args, env, "default", TypeRef("Int"), context_kind)
+            return TypeRef("Int")
+        if name in {"uuid", "now"}:
+            self.bind_builtin_args(expr, [], required=[])
+            return TypeRef("Text")
+        if name == "read_text":
+            if context_kind not in {"command", "route", "test"}:
+                self.error("`read_text` is only allowed in command, route, and test blocks.", expr.location, "Move file reads out of pure functions and config defaults.")
+            args = self.bind_builtin_args(expr, ["path"], required=["path"])
+            self.check_bound_arg_type(args, env, "path", TypeRef("Text"), context_kind)
+            return TypeRef("Text")
+        if name == "write_text":
+            if context_kind not in {"command", "test"}:
+                self.error("`write_text` is only allowed in command and test blocks.", expr.location, "Move file writes out of pure functions and routes.")
+            args = self.bind_builtin_args(expr, ["path", "content"], required=["path", "content"])
+            self.check_bound_arg_type(args, env, "path", TypeRef("Text"), context_kind)
+            self.check_bound_arg_type(args, env, "content", TypeRef("Text"), context_kind)
+            return TypeRef("Bool")
+        return TypeRef("Unknown")
+
+    def bind_builtin_args(self, expr: CallExpr, allowed: list[str], *, required: list[str]) -> dict[str, Arg]:
+        builtin_name = expr.callee[0]
+        bound: dict[str, Arg] = {}
+        seen_named = False
+        positional_index = 0
+        for arg in expr.args:
+            if arg.name is None:
+                if seen_named:
+                    self.error(
+                        "Positional arguments cannot follow named arguments.",
+                        arg.location,
+                        "Move positional arguments before named arguments.",
+                        code="SLC021",
+                    )
+                    continue
+                if positional_index >= len(allowed):
+                    self.error(
+                        f"Builtin `{builtin_name}` called with too many arguments.",
+                        arg.location,
+                        "Remove extra arguments.",
+                        code="SLC022",
+                    )
+                    continue
+                bound[allowed[positional_index]] = arg
+                positional_index += 1
+                continue
+            seen_named = True
+            if arg.name not in allowed:
+                self.error(
+                    f"Builtin `{builtin_name}` has no argument `{arg.name}`.",
+                    arg.location,
+                    "Use a documented builtin argument name.",
+                    code="SLC023",
+                )
+                continue
+            if arg.name in bound:
+                self.error(
+                    f"Argument `{arg.name}` is provided more than once.",
+                    arg.location,
+                    "Provide each argument once.",
+                    code="SLC024",
+                )
+                continue
+            bound[arg.name] = arg
+        for name in required:
+            if name not in bound:
+                self.error(
+                    f"Missing argument `{name}` for builtin `{builtin_name}`.",
+                    expr.location,
+                    "Pass every required argument.",
+                    code="SLC025",
+                )
+        return bound
+
+    def check_bound_arg_type(
+        self,
+        args: dict[str, Arg],
+        env: dict[str, TypeRef],
+        name: str,
+        expected: TypeRef,
+        context_kind: str,
+    ) -> None:
+        arg = args.get(name)
+        if arg is None:
+            return
+        actual = self.infer_expr(arg.expr, env, context_kind=context_kind)
+        if not self.type_matches(expected, actual):
+            self.error(
+                f"Argument `{name}` expected `{expected.render()}`, found `{actual.render()}`.",
+                arg.location,
+                "Pass a value with the expected type.",
+            )
+
+    def named_arg(self, expr: CallExpr, name: str) -> Arg | None:
+        return next((arg for arg in expr.args if arg.name == name), None)
+
+    def check_arg_type(
+        self,
+        expr: CallExpr,
+        env: dict[str, TypeRef],
+        index: int,
+        expected: TypeRef,
+        context_kind: str,
+    ) -> None:
+        if len(expr.args) <= index:
+            return
+        actual = self.infer_expr(expr.args[index].expr, env, context_kind=context_kind)
+        if not self.type_matches(expected, actual):
+            self.error(
+                f"Argument {index + 1} expected `{expected.render()}`, found `{actual.render()}`.",
+                expr.args[index].location,
+                "Pass a value with the expected type.",
+            )
 
     def check_store_id_arg(self, expr: CallExpr, env: dict[str, TypeRef], item_type: TypeRef) -> None:
         if not expr.args:
@@ -713,7 +992,7 @@ class Checker:
             self.expect_arg_count(expr, 0)
             return TypeRef("Option", [TypeRef("Unknown")])
         self.expect_arg_count(expr, 1)
-        value_type = self.infer_expr(expr.args[0].expr, env) if expr.args else TypeRef("Unknown")
+        value_type = self.infer_expr(expr.args[0].expr, env, context_kind=self.context_kind) if expr.args else TypeRef("Unknown")
         if callee == "some":
             return TypeRef("Option", [value_type])
         if callee == "ok":
@@ -753,7 +1032,7 @@ class Checker:
                     "Remove the field or add it to the type declaration.",
                 )
                 continue
-            actual = self.infer_expr(field.expr, env)
+            actual = self.infer_expr(field.expr, env, context_kind=self.context_kind)
             if not self.type_matches(expected_field.type_ref, actual):
                 self.error(
                     f"Field `{field.name}` expected `{expected_field.type_ref.render()}`, found `{actual.render()}`.",
