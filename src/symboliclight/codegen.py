@@ -35,6 +35,7 @@ def generate_python(app: App) -> str:
 @dataclass(slots=True)
 class PythonGenerator:
     app: App
+    current_module_alias: str | None = None
 
     def generate(self) -> str:
         lines: list[str] = [
@@ -80,6 +81,7 @@ class PythonGenerator:
             "",
         ]
         lines.extend(self.emit_init_db())
+        lines.extend(self.emit_imported_functions())
         for function in self.app.functions:
             lines.extend(self.emit_function(function))
         for route in self.app.routes:
@@ -167,11 +169,21 @@ class PythonGenerator:
         ])
         return lines
 
-    def emit_function(self, function: FunctionDecl) -> list[str]:
-        name = self.python_function_name(function)
+    def emit_imported_functions(self) -> list[str]:
+        lines: list[str] = []
+        for alias, module in self.app.imported_modules.items():
+            for function in module.functions:
+                lines.extend(self.emit_function(function, module_alias=alias))
+        return lines
+
+    def emit_function(self, function: FunctionDecl, *, module_alias: str | None = None) -> list[str]:
+        name = self.python_function_name(function, module_alias=module_alias)
         params = ", ".join(param.name for param in function.params)
         lines = [self.source_comment(function.location), f"def {name}({params}):"]
+        previous_module_alias = self.current_module_alias
+        self.current_module_alias = module_alias
         lines.extend(self.emit_body(function.body, indent="    "))
+        self.current_module_alias = previous_module_alias
         if not function.body:
             lines.append("    pass")
         lines.append("")
@@ -347,7 +359,15 @@ class PythonGenerator:
             store, method = expr.callee
             args = ", ".join(self.arg_expr(arg) for arg in expr.args)
             return f"{store}_{method}({args})"
-        if len(expr.callee) == 1 and expr.callee[0] in {function.name for function in self.app.functions}:
+        if len(expr.callee) == 2 and self.module_function_exists(expr.callee[0], expr.callee[1]):
+            callee = self.python_module_function_name(expr.callee[0], expr.callee[1])
+        elif (
+            self.current_module_alias is not None
+            and len(expr.callee) == 1
+            and self.module_function_exists(self.current_module_alias, expr.callee[0])
+        ):
+            callee = self.python_module_function_name(self.current_module_alias, expr.callee[0])
+        elif len(expr.callee) == 1 and expr.callee[0] in {function.name for function in self.app.functions}:
             function = self.function_by_name(expr.callee[0])
             callee = self.python_function_name(function)
         else:
@@ -383,15 +403,25 @@ class PythonGenerator:
     def function_by_name(self, name: str) -> FunctionDecl:
         return next(function for function in self.app.functions if function.name == name)
 
-    def python_function_name(self, function: FunctionDecl) -> str:
+    def python_function_name(self, function: FunctionDecl, *, module_alias: str | None = None) -> str:
         prefix = "cmd" if function.kind == "command" else "fn"
+        if module_alias is not None:
+            return f"{prefix}_{module_alias}_{function.name}"
         return f"{prefix}_{function.name}"
+
+    def python_module_function_name(self, alias: str, name: str) -> str:
+        function = self.module_function_by_name(alias, name)
+        return self.python_function_name(function, module_alias=alias)
 
     def enum_variant_literal(self, parts: list[str]) -> str | None:
         if len(parts) == 2:
             enum_name, variant = parts
             if any(enum_decl.name == enum_name and variant in enum_decl.variants for enum_decl in self.app.enums):
                 return repr(variant)
+            if self.current_module_alias is not None:
+                module = self.app.imported_modules.get(self.current_module_alias)
+                if module and any(enum_decl.name == enum_name and variant in enum_decl.variants for enum_decl in module.enums):
+                    return repr(variant)
         if len(parts) == 3:
             alias, enum_name, variant = parts
             module = self.app.imported_modules.get(alias)
@@ -401,3 +431,11 @@ class PythonGenerator:
 
     def source_comment(self, location) -> str:
         return f"# source: {location.path}:{location.line}"
+
+    def module_function_exists(self, alias: str, name: str) -> bool:
+        module = self.app.imported_modules.get(alias)
+        return bool(module and any(function.name == name for function in module.functions))
+
+    def module_function_by_name(self, alias: str, name: str) -> FunctionDecl:
+        module = self.app.imported_modules[alias]
+        return next(function for function in module.functions if function.name == name)

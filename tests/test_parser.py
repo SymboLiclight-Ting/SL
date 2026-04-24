@@ -39,3 +39,22 @@ def test_parser_accepts_module_import_enum_and_intent_test() -> None:
 def test_parser_rejects_malformed_block() -> None:
     with pytest.raises(SymbolicLightError):
         parse_source("app Broken { type Todo = { id: Id<Todo> }", path="broken.sl")
+
+
+def test_parser_recovers_from_invalid_module_item_without_hanging() -> None:
+    source = """
+module bad {
+  command nope() -> Text {
+    return "bad"
+  }
+
+  type Item = {
+    id: Id<Item>,
+  }
+}
+"""
+
+    with pytest.raises(SymbolicLightError) as exc:
+        parse_source(source, path="bad.sl")
+
+    assert any("Expected module item" in diagnostic.message for diagnostic in exc.value.diagnostics)

@@ -17,6 +17,7 @@ The v0.2 compiler supports:
 - `intent "./file.intent.yaml"` links to IntentSpec contracts.
 - `permissions from intent.permissions` and `test from intent.acceptance` declarations.
 - `enum` declarations and `type` record declarations.
+- pure `fn` declarations inside modules and apps.
 - `Option<T>` and `Result<T, E>` type references.
 - `store` declarations backed by SQLite.
 - `command` handlers compiled to CLI subcommands.
@@ -76,6 +77,10 @@ module models {
     status: Status,
     assignee: Option<Text>,
   }
+
+  fn is_open(status: Status) -> Bool {
+    return status == Status.open
+  }
 }
 ```
 
@@ -87,6 +92,10 @@ app IssueTracker {
 
   command create(title: Text) -> models.Issue {
     return issues.insert({ title: title, status: models.Status.open })
+  }
+
+  route GET "/open" -> Bool {
+    return models.is_open(models.Status.open)
   }
 }
 ```

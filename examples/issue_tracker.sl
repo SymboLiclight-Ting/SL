@@ -24,5 +24,6 @@ app IssueTracker {
   test "create issue" {
     let issue = create("Bug")
     assert issue.status == models.Status.open
+    assert models.is_open(issue.status) == true
   }
 }

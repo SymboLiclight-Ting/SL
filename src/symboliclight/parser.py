@@ -439,6 +439,8 @@ class Parser:
         )
 
     def synchronize_item(self) -> None:
+        if not self.at_end():
+            self.advance()
         while not self.at_end():
             if self.check_symbol("}"):
                 return

@@ -5,9 +5,12 @@
 Implemented in the current mainline:
 
 - explicit `module` and aliased `import`,
+- imported pure module functions compile to Python,
 - `enum`, `Option<T>`, and `Result<T, E>` type support,
 - pure `fn` boundary checks,
 - stricter store field checks,
+- stricter store id and filter argument checks,
+- parser recovery no longer hangs on invalid module items,
 - official `slc fmt`,
 - `slc doctor`, `slc init`, `slc new api`, and `slc add route`,
 - generated Python source comments,

@@ -16,6 +16,7 @@ from symboliclight.ast import (
     ListExpr,
     LiteralExpr,
     Module,
+    Param,
     PathExpr,
     RecordExpr,
     ReturnStmt,
@@ -138,7 +139,11 @@ class Checker:
             for enum_decl in imported.enums:
                 self.enums[f"{import_decl.alias}.{enum_decl.name}"] = enum_decl
             for function in imported.functions:
-                self.imported_functions[f"{import_decl.alias}.{function.name}"] = function
+                self.imported_functions[f"{import_decl.alias}.{function.name}"] = self.qualify_function_decl(
+                    function,
+                    import_decl.alias,
+                    imported,
+                )
 
     def qualify_type_decl(self, type_decl: TypeDecl, alias: str, module: Module) -> TypeDecl:
         fields = [
@@ -155,6 +160,20 @@ class Checker:
         local_names = {item.name for item in module.types} | {item.name for item in module.enums}
         name = f"{alias}.{type_ref.name}" if type_ref.name in local_names else type_ref.name
         return TypeRef(name, [self.qualify_type_ref(arg, alias, module) for arg in type_ref.args])
+
+    def qualify_function_decl(self, function: FunctionDecl, alias: str, module: Module) -> FunctionDecl:
+        params = [
+            Param(param.name, self.qualify_type_ref(param.type_ref, alias, module), param.location)
+            for param in function.params
+        ]
+        return FunctionDecl(
+            function.kind,
+            function.name,
+            params,
+            self.qualify_type_ref(function.return_type, alias, module),
+            function.body,
+            function.location,
+        )
 
     def check_duplicate_names(self) -> None:
         names: set[str] = set()
@@ -447,26 +466,43 @@ class Checker:
             return TypeRef("Unknown")
         if method == "insert":
             self.expect_arg_count(expr, 1)
-            if expr.args and isinstance(expr.args[0].expr, RecordExpr):
-                self.validate_record_expr(expr.args[0].expr, item_type, allow_missing_id=True, env=env)
+            if expr.args:
+                if isinstance(expr.args[0].expr, RecordExpr):
+                    self.validate_record_expr(expr.args[0].expr, item_type, allow_missing_id=True, env=env)
+                else:
+                    self.error(
+                        "Store insert requires a record literal in v0.2.",
+                        expr.args[0].location,
+                        "Use `items.insert({ field: value })`.",
+                    )
             return item_type
         if method == "all":
             self.expect_arg_count(expr, 0)
             return TypeRef("List", [item_type])
         if method == "get":
             self.expect_arg_count(expr, 1)
+            self.check_store_id_arg(expr, env, item_type)
             return TypeRef("Option", [item_type])
         if method == "update":
             self.expect_arg_count(expr, 2)
-            if len(expr.args) >= 2 and isinstance(expr.args[1].expr, RecordExpr):
-                self.validate_record_expr(expr.args[1].expr, item_type, allow_missing_id=True, env=env)
+            self.check_store_id_arg(expr, env, item_type)
+            if len(expr.args) >= 2:
+                if isinstance(expr.args[1].expr, RecordExpr):
+                    self.validate_record_expr(expr.args[1].expr, item_type, allow_missing_id=True, env=env)
+                else:
+                    self.error(
+                        "Store update requires a record literal in v0.2.",
+                        expr.args[1].location,
+                        "Use `items.update(id, { field: value })`.",
+                    )
             return item_type
         if method == "delete":
             self.expect_arg_count(expr, 1)
+            self.check_store_id_arg(expr, env, item_type)
             return TypeRef("Bool")
         if method == "filter":
             record = self.types.get(item_type.name)
-            valid_fields = {field.name for field in record.fields} if record else set()
+            fields = {field.name: field for field in record.fields} if record else {}
             for arg in expr.args:
                 if arg.name is None:
                     self.error(
@@ -474,15 +510,35 @@ class Checker:
                         arg.location,
                         "Use `items.filter(field: value)`.",
                     )
-                elif arg.name not in valid_fields:
+                elif arg.name not in fields:
                     self.error(
                         f"Type `{item_type.render()}` has no field `{arg.name}`.",
                         arg.location,
                         "Filter by a declared record field.",
                     )
-                self.infer_expr(arg.expr, env)
+                else:
+                    actual = self.infer_expr(arg.expr, env)
+                    expected = fields[arg.name].type_ref
+                    if not self.type_matches(expected, actual):
+                        self.error(
+                            f"Filter `{arg.name}` expected `{expected.render()}`, found `{actual.render()}`.",
+                            arg.location,
+                            "Use a filter value that matches the field type.",
+                        )
             return TypeRef("List", [item_type])
         return TypeRef("Unknown")
+
+    def check_store_id_arg(self, expr: CallExpr, env: dict[str, TypeRef], item_type: TypeRef) -> None:
+        if not expr.args:
+            return
+        actual = self.infer_expr(expr.args[0].expr, env)
+        expected = TypeRef("Id", [item_type])
+        if actual.name != "Int" and not self.type_matches(expected, actual):
+            self.error(
+                f"`{'.'.join(expr.callee)}` id expected `Int` or `{expected.render()}`, found `{actual.render()}`.",
+                expr.args[0].location,
+                "Pass a store id value.",
+            )
 
     def infer_wrapper_constructor(self, expr: CallExpr, env: dict[str, TypeRef]) -> TypeRef:
         callee = expr.callee[0]

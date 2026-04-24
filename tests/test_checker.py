@@ -115,3 +115,67 @@ app Bad {
     diagnostics = check_program(app, source_path=Path("bad.sl"))
 
     assert any("has no field `extra`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_store_insert_without_record_literal() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command add(title: Text) -> Todo {
+    return todos.insert(title)
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Store insert requires a record literal" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_filter_value_type_mismatch() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+    done: Bool,
+  }
+
+  store todos: Todo
+
+  command find() -> List<Todo> {
+    return todos.filter(done: "no")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Filter `done` expected `Bool`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_bad_store_id_argument() -> None:
+    source = """
+app Bad {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command load(title: Text) -> Option<Todo> {
+    return todos.get(title)
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("id expected `Int`" in diagnostic.message for diagnostic in diagnostics)

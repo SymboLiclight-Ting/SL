@@ -27,7 +27,7 @@ Imports are explicit and local to the current file:
 import "./models.sl" as models
 ```
 
-Imported declarations are referenced through the alias, for example `models.Issue` or `models.Status.open`. SymbolicLight has no implicit global sharing.
+Imported declarations are referenced through the alias, for example `models.Issue`, `models.Status.open`, or `models.is_open(value)`. SymbolicLight has no implicit global sharing.
 
 ## IntentSpec Declarations
 
@@ -97,11 +97,15 @@ todos.delete(id) -> Bool
 todos.filter(field: value) -> List<Todo>
 ```
 
-`insert` and `update` validate record fields at compile time when the argument is a record literal.
+`insert` and `update` require record literals in v0.2. The checker validates unknown fields, missing required fields, and obvious field type mismatches.
+
+`get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
+
+`filter` requires named arguments and validates each filter value against the matching record field type.
 
 ### `fn`
 
-`fn` is pure application logic. It must not call store methods, commands, routes, or runtime side effects.
+`fn` is pure application logic. It must not call store methods, commands, routes, or runtime side effects. Imported module functions compile into generated Python with stable names such as `fn_models_is_open`.
 
 ### `command`
 

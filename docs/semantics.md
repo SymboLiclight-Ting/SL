@@ -21,7 +21,7 @@ Records and enums define the stable application data surface.
 
 ## Function Boundary
 
-`fn` is pure application logic. The checker rejects store access inside `fn`.
+`fn` is pure application logic. The checker rejects store access inside `fn`. Pure functions declared in imported modules may be called through their import alias and are emitted into generated Python.
 
 `command` is a CLI boundary. Commands may call pure functions and store methods.
 
@@ -42,7 +42,11 @@ Supported store methods:
 - `delete(id) -> Bool`
 - `filter(field: value) -> List<Item>`
 
-When a record literal is passed to `insert` or `update`, the checker validates unknown fields, missing required fields, and obvious field type mismatches.
+`insert` and `update` require record literals in v0.2. The checker validates unknown fields, missing required fields, and obvious field type mismatches.
+
+`get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
+
+`filter` requires named arguments and validates field value types.
 
 ## Enum Semantics
 

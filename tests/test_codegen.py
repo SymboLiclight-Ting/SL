@@ -57,6 +57,7 @@ def test_codegen_supports_imported_enum_store_and_source_comments(tmp_path: Path
     db_path = tmp_path / "issue.sqlite"
 
     assert "# source:" in generated
+    assert "def fn_models_is_open(status):" in generated
     py_compile.compile(str(output), doraise=True)
 
     created = subprocess.run(

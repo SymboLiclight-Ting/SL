@@ -47,6 +47,7 @@ Supported:
 - record and list literals
 - field access and function calls
 - `Option<T>` and `Result<T, E>` type references
+- imported module `fn` calls
 
 Out of scope:
 
@@ -79,6 +80,7 @@ When IntentSpec is installed, `slc check` validates the referenced file. Without
 - Compatibility-impacting changes must update `docs/compatibility.md`.
 - Codegen behavior changes must include tests that compile and run generated Python.
 - Formatter changes must include snapshot-like tests or CLI coverage.
+- Parser recovery changes must include a malformed fixture test.
 - Generated Python should stay readable and use the standard library where possible.
 
 ## Verification

@@ -32,7 +32,9 @@ def test_cli_fmt_doctor_init_new_and_add_route(tmp_path: Path, monkeypatch) -> N
     project = tmp_path / "demo"
     assert main(["init", str(project)]) == 0
     assert (project / "app.sl").exists()
+    assert main(["check", str(project / "app.sl")]) == 0
 
     monkeypatch.chdir(tmp_path)
     assert main(["new", "api", "sample"]) == 0
     assert (tmp_path / "sample.sl").exists()
+    assert main(["check", str(tmp_path / "sample.sl")]) == 0

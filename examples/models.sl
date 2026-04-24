@@ -7,4 +7,8 @@ module models {
     status: Status,
     assignee: Option<Text>,
   }
+
+  fn is_open(status: Status) -> Bool {
+    return status == Status.open
+  }
 }

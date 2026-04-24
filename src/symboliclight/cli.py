@@ -262,10 +262,48 @@ def sample_app(app_name: str, intent_path: str) -> str:
 
 
 def sample_intent(app_name: str) -> str:
-    return f"""name: {app_name}
-summary: Generated SymbolicLight API skeleton.
-acceptance: []
-permissions: []
+    return f"""version: "0.1"
+kind: "IntentSpec"
+
+metadata:
+  name: "{app_name.lower()}"
+  title: "{app_name}"
+  owner: "symboliclight"
+
+task:
+  goal: "Build a generated SymbolicLight API skeleton."
+  audience:
+    - "Application developer"
+  priority: "medium"
+
+permissions:
+  web: false
+  filesystem:
+    read: true
+    write: true
+  network: false
+  tools:
+    create_file: true
+    delete_file: false
+    send_email: false
+    purchase: false
+
+constraints:
+  - "Use local SQLite storage only."
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 500
+  sections:
+    - "Build"
+    - "Run"
+    - "Test"
+
+tests:
+  - name: "Generated app smoke test"
+    assert:
+      - type: "required_sections"
 """
 
 
