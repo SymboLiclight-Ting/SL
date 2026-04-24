@@ -179,6 +179,8 @@ slc new api <name>
 slc add route GET /items <path>
 ```
 
+`slc fmt` is intentionally conservative in v0.2. It refuses to rewrite files containing `//` comments because the formatter does not yet have comment-preserving trivia support.
+
 ## Generated Python Contract
 
 The compiler emits one Python 3.11 file using standard library modules first:

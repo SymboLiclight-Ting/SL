@@ -35,7 +35,8 @@ def generate_python(app: App) -> str:
 @dataclass(slots=True)
 class PythonGenerator:
     app: App
-    current_module_alias: str | None = None
+    current_module_path: tuple[str, ...] = ()
+    current_module: Module | None = None
 
     def generate(self) -> str:
         lines: list[str] = [
@@ -172,18 +173,34 @@ class PythonGenerator:
     def emit_imported_functions(self) -> list[str]:
         lines: list[str] = []
         for alias, module in self.app.imported_modules.items():
-            for function in module.functions:
-                lines.extend(self.emit_function(function, module_alias=alias))
+            lines.extend(self.emit_module_functions((alias,), module))
         return lines
 
-    def emit_function(self, function: FunctionDecl, *, module_alias: str | None = None) -> list[str]:
-        name = self.python_function_name(function, module_alias=module_alias)
+    def emit_module_functions(self, module_path: tuple[str, ...], module: Module) -> list[str]:
+        lines: list[str] = []
+        for alias, imported in module.imported_modules.items():
+            lines.extend(self.emit_module_functions((*module_path, alias), imported))
+        for function in module.functions:
+            lines.extend(self.emit_function(function, module_path=module_path, module=module))
+        return lines
+
+    def emit_function(
+        self,
+        function: FunctionDecl,
+        *,
+        module_path: tuple[str, ...] = (),
+        module: Module | None = None,
+    ) -> list[str]:
+        name = self.python_function_name(function, module_path=module_path)
         params = ", ".join(param.name for param in function.params)
         lines = [self.source_comment(function.location), f"def {name}({params}):"]
-        previous_module_alias = self.current_module_alias
-        self.current_module_alias = module_alias
+        previous_module_path = self.current_module_path
+        previous_module = self.current_module
+        self.current_module_path = module_path
+        self.current_module = module
         lines.extend(self.emit_body(function.body, indent="    "))
-        self.current_module_alias = previous_module_alias
+        self.current_module_path = previous_module_path
+        self.current_module = previous_module
         if not function.body:
             lines.append("    pass")
         lines.append("")
@@ -233,6 +250,15 @@ class PythonGenerator:
             "",
             "    def do_POST(self):",
             "        self.handle_method('POST')",
+            "",
+            "    def do_PUT(self):",
+            "        self.handle_method('PUT')",
+            "",
+            "    def do_PATCH(self):",
+            "        self.handle_method('PATCH')",
+            "",
+            "    def do_DELETE(self):",
+            "        self.handle_method('DELETE')",
             "",
             "    def handle_method(self, method):",
             "        handler = ROUTES.get((method, self.path))",
@@ -359,14 +385,10 @@ class PythonGenerator:
             store, method = expr.callee
             args = ", ".join(self.arg_expr(arg) for arg in expr.args)
             return f"{store}_{method}({args})"
-        if len(expr.callee) == 2 and self.module_function_exists(expr.callee[0], expr.callee[1]):
-            callee = self.python_module_function_name(expr.callee[0], expr.callee[1])
-        elif (
-            self.current_module_alias is not None
-            and len(expr.callee) == 1
-            and self.module_function_exists(self.current_module_alias, expr.callee[0])
-        ):
-            callee = self.python_module_function_name(self.current_module_alias, expr.callee[0])
+        resolved_module_function = self.resolve_module_function(expr.callee)
+        if resolved_module_function is not None:
+            module_path, function = resolved_module_function
+            callee = self.python_function_name(function, module_path=module_path)
         elif len(expr.callee) == 1 and expr.callee[0] in {function.name for function in self.app.functions}:
             function = self.function_by_name(expr.callee[0])
             callee = self.python_function_name(function)
@@ -403,28 +425,23 @@ class PythonGenerator:
     def function_by_name(self, name: str) -> FunctionDecl:
         return next(function for function in self.app.functions if function.name == name)
 
-    def python_function_name(self, function: FunctionDecl, *, module_alias: str | None = None) -> str:
+    def python_function_name(self, function: FunctionDecl, *, module_path: tuple[str, ...] = ()) -> str:
         prefix = "cmd" if function.kind == "command" else "fn"
-        if module_alias is not None:
-            return f"{prefix}_{module_alias}_{function.name}"
+        if module_path:
+            return f"{prefix}_{'_'.join(module_path)}_{function.name}"
         return f"{prefix}_{function.name}"
-
-    def python_module_function_name(self, alias: str, name: str) -> str:
-        function = self.module_function_by_name(alias, name)
-        return self.python_function_name(function, module_alias=alias)
 
     def enum_variant_literal(self, parts: list[str]) -> str | None:
         if len(parts) == 2:
             enum_name, variant = parts
             if any(enum_decl.name == enum_name and variant in enum_decl.variants for enum_decl in self.app.enums):
                 return repr(variant)
-            if self.current_module_alias is not None:
-                module = self.app.imported_modules.get(self.current_module_alias)
-                if module and any(enum_decl.name == enum_name and variant in enum_decl.variants for enum_decl in module.enums):
+            if self.current_module is not None:
+                if any(enum_decl.name == enum_name and variant in enum_decl.variants for enum_decl in self.current_module.enums):
                     return repr(variant)
         if len(parts) == 3:
             alias, enum_name, variant = parts
-            module = self.app.imported_modules.get(alias)
+            module = self.resolve_module_alias(alias)
             if module and any(enum_decl.name == enum_name and variant in enum_decl.variants for enum_decl in module.enums):
                 return repr(variant)
         return None
@@ -432,10 +449,28 @@ class PythonGenerator:
     def source_comment(self, location) -> str:
         return f"# source: {location.path}:{location.line}"
 
-    def module_function_exists(self, alias: str, name: str) -> bool:
-        module = self.app.imported_modules.get(alias)
-        return bool(module and any(function.name == name for function in module.functions))
+    def resolve_module_function(self, callee: list[str]) -> tuple[tuple[str, ...], FunctionDecl] | None:
+        if len(callee) == 1 and self.current_module is not None:
+            function = self.find_module_function(self.current_module, callee[0])
+            if function is not None:
+                return self.current_module_path, function
+        if len(callee) != 2:
+            return None
+        alias, name = callee
+        module = self.resolve_module_alias(alias)
+        if module is None:
+            return None
+        function = self.find_module_function(module, name)
+        if function is None:
+            return None
+        if self.current_module is not None and alias in self.current_module.imported_modules:
+            return (*self.current_module_path, alias), function
+        return (alias,), function
 
-    def module_function_by_name(self, alias: str, name: str) -> FunctionDecl:
-        module = self.app.imported_modules[alias]
-        return next(function for function in module.functions if function.name == name)
+    def resolve_module_alias(self, alias: str) -> Module | None:
+        if self.current_module is not None and alias in self.current_module.imported_modules:
+            return self.current_module.imported_modules[alias]
+        return self.app.imported_modules.get(alias)
+
+    def find_module_function(self, module: Module, name: str) -> FunctionDecl | None:
+        return next((function for function in module.functions if function.name == name), None)

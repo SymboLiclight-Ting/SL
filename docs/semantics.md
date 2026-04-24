@@ -69,3 +69,9 @@ Generated Python includes source comments:
 ```
 
 These comments are the v0.2 source-map seed. Later releases should use them to improve Python exception backreferences.
+
+## Formatting Boundary
+
+The v0.2 formatter is the official style source for comment-free `.sl` files.
+
+Files containing `//` comments are not rewritten in v0.2. The formatter exits with an error instead of deleting comments, because comment-preserving formatting requires lexer trivia support.

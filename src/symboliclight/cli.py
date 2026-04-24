@@ -156,6 +156,12 @@ def load_checked_unit(source_path: Path, *, strict_intent: bool) -> tuple[Unit, 
 
 def format_file(source_path: Path, *, check_only: bool) -> int:
     source = source_path.read_text(encoding="utf-8")
+    if contains_line_comment(source):
+        print(
+            f"{source_path}: cannot format files with // comments without dropping comments",
+            file=sys.stderr,
+        )
+        return 1
     formatted = format_unit(parse_source(source, path=str(source_path)))
     if check_only:
         if formatted != source:
@@ -166,6 +172,24 @@ def format_file(source_path: Path, *, check_only: bool) -> int:
     source_path.write_text(formatted, encoding="utf-8")
     print(f"formatted {source_path}")
     return 0
+
+
+def contains_line_comment(source: str) -> bool:
+    in_string = False
+    escaped = False
+    for index, char in enumerate(source):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and in_string:
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if not in_string and char == "/" and index + 1 < len(source) and source[index + 1] == "/":
+            return True
+    return False
 
 
 def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path) -> str:

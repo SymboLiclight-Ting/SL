@@ -38,3 +38,19 @@ def test_cli_fmt_doctor_init_new_and_add_route(tmp_path: Path, monkeypatch) -> N
     assert main(["new", "api", "sample"]) == 0
     assert (tmp_path / "sample.sl").exists()
     assert main(["check", str(tmp_path / "sample.sl")]) == 0
+
+
+def test_cli_fmt_refuses_to_drop_comments(tmp_path: Path) -> None:
+    source = tmp_path / "commented.sl"
+    original = """
+// keep this intent note
+app Commented {
+  route GET "/note" -> Text {
+    return "ok"
+  }
+}
+""".lstrip()
+    source.write_text(original, encoding="utf-8")
+
+    assert main(["fmt", str(source)]) == 1
+    assert source.read_text(encoding="utf-8") == original
