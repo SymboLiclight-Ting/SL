@@ -1,8 +1,11 @@
 from pathlib import Path
 import json
 import py_compile
+import sqlite3
 
 from symboliclight.cli import load_checked_unit, main
+from symboliclight.codegen import generate_schema_hash
+from symboliclight.parser import parse_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -289,6 +292,92 @@ app SchemaDemo {
     assert main(["doctor", str(source)]) == 0
     doctor = capsys.readouterr().out
     assert "route schemas: 1/1 request bodies typed" in doctor
+
+
+def test_cli_doctor_reports_schema_drift_from_db(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    source.write_text(
+        """
+app DriftDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+}
+""",
+        encoding="utf-8",
+    )
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute("INSERT INTO sl_migrations (version, schema_hash) VALUES (1, 'old')")
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["doctor", str(source), "--db", str(db_path)]) == 0
+    doctor = capsys.readouterr().out
+
+    assert "schema drift: drift detected" in doctor
+    assert "schema drift suggestion:" in doctor
+
+
+def test_cli_doctor_reports_uninitialized_schema_db(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "missing.sqlite"
+    source.write_text(
+        """
+app DriftDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["doctor", str(source), "--db", str(db_path)]) == 0
+    doctor = capsys.readouterr().out
+
+    assert "schema drift: not initialized" in doctor
+
+
+def test_cli_doctor_reports_up_to_date_schema_db(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    text = """
+app DriftDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+}
+"""
+    source.write_text(text, encoding="utf-8")
+    app = parse_source(text, path=str(source))
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute(
+            "INSERT INTO sl_migrations (version, schema_hash) VALUES (1, ?)",
+            [generate_schema_hash(app)],
+        )
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["doctor", str(source), "--db", str(db_path)]) == 0
+    doctor = capsys.readouterr().out
+
+    assert "schema drift: up to date" in doctor
 
 
 def test_cli_schema_includes_imported_enums(tmp_path: Path) -> None:

@@ -394,6 +394,70 @@ app Bad {
     assert any("Return type mismatch" in diagnostic.message for diagnostic in diagnostics)
 
 
+def test_checker_accepts_request_header_in_routes() -> None:
+    source = """
+app Good {
+  config AdminConfig = {
+    admin_token: Text = env("ADMIN_TOKEN", "dev-token"),
+  }
+
+  route GET "/secure" -> Response<Text> {
+    if request.header("Authorization") == some(AdminConfig.admin_token) {
+      return response(status: 200, body: "ok")
+    } else {
+      return response(status: 401, body: "unauthorized")
+    }
+  }
+}
+"""
+    app = parse_source(source, path="good.sl")
+    diagnostics = check_program(app, source_path=Path("good.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_request_header_outside_routes() -> None:
+    source = """
+app Bad {
+  command bad() -> Option<Text> {
+    return request.header("Authorization")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("`request.header` is only allowed in route blocks" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_request_header_non_text_name() -> None:
+    source = """
+app Bad {
+  route GET "/secure" -> Option<Text> {
+    return request.header(123)
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Argument `name` expected `Text`, found `Int`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_request_header_unknown_named_arg() -> None:
+    source = """
+app Bad {
+  route GET "/secure" -> Option<Text> {
+    return request.header(value: "Authorization")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Builtin `request.header` has no argument `value`" in diagnostic.message for diagnostic in diagnostics)
+
+
 def test_checker_validates_fixture_records() -> None:
     source = """
 app Bad {

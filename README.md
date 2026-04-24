@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.6 developer preview supports:
+The v0.7 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -46,6 +46,8 @@ The v0.6 developer preview supports:
 - local playground under `playground/`.
 - IntentSpec-aware `slc doctor` route, command, and permission alignment hints.
 - IntentSpec acceptance checks through `slc test` for apps that declare `test from intent.acceptance`.
+- route auth checks through the minimal `request.header(...)` helper.
+- schema drift inspection through `slc doctor --db`.
 - repeatable release smoke checks through `scripts/release_check.py`.
 
 ## Quick Start
@@ -58,6 +60,7 @@ slc build examples/todo_app.sl --out build/todo_app.py
 slc schema examples/notes_api.sl --out build/notes_schema.json
 slc fmt examples/todo_app.sl --check
 slc doctor examples/todo_app.sl
+slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite
 slc lsp
 python build/todo_app.py test
 python build/todo_app.py add "Buy milk"
@@ -165,6 +168,7 @@ slc run <file.sl> -- add "Buy milk"
 slc test <file.sl>
 slc fmt <file.sl>
 slc doctor <file.sl>
+slc doctor <file.sl> --db path/to/app.sqlite
 slc lsp
 slc init <dir>
 slc new api <name>

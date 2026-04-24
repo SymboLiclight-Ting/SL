@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -10,7 +11,7 @@ from pathlib import Path
 from symboliclight.ast import App, Unit
 from symboliclight.cache import read_check_cache, write_check_cache
 from symboliclight.checker import check_program_result
-from symboliclight.codegen import generate_python, generate_python_artifact
+from symboliclight.codegen import generate_python, generate_python_artifact, generate_schema_hash
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError, raise_if_errors
 from symboliclight.formatter import format_unit
 from symboliclight.intent import IntentContract, load_intent_contract
@@ -55,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser = sub.add_parser("doctor")
     doctor_parser.add_argument("source")
     doctor_parser.add_argument("--strict-intent", action="store_true")
+    doctor_parser.add_argument("--db")
 
     sub.add_parser("lsp")
 
@@ -153,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "doctor":
             unit, diagnostics, cache_hit = load_checked_unit(Path(args.source), strict_intent=args.strict_intent)
             print_diagnostics(diagnostics)
-            print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit))
+            print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit, db_path=Path(args.db) if args.db else None))
             return 1 if any(diagnostic.severity == "error" for diagnostic in diagnostics) else 0
         if args.command == "lsp":
             run_lsp_server()
@@ -251,7 +253,14 @@ def contains_line_comment(source: str) -> bool:
     return contains_line_comment_source(source)
 
 
-def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, *, cache_hit: bool) -> str:
+def doctor_report(
+    unit: Unit,
+    diagnostics: list[Diagnostic],
+    source_path: Path,
+    *,
+    cache_hit: bool,
+    db_path: Path | None = None,
+) -> str:
     lines = ["SymbolicLight doctor"]
     lines.append(f"- source: {source_path}")
     lines.append(f"- unit: {'app' if isinstance(unit, App) else 'module'} {unit.name}")
@@ -273,7 +282,10 @@ def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, 
         if untyped_mutating:
             rendered = ", ".join(f"{route.method} {route.path}" for route in untyped_mutating)
             lines.append(f"- route body warning: missing typed body for {rendered}")
-        lines.append("- schema drift: checked by generated Python at startup")
+        if db_path is None:
+            lines.append("- schema drift: checked by generated Python at startup")
+        else:
+            lines.extend(schema_drift_lines(unit, db_path))
         if any(test.external_ref == "intent.acceptance" for test in unit.tests):
             lines.append("- intent acceptance: declared")
         elif unit.intents:
@@ -293,6 +305,41 @@ def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, 
         lines.append(f"- types: {len(unit.types)}")
         lines.append(f"- enums: {len(unit.enums)}")
     return "\n".join(lines)
+
+
+def schema_drift_lines(app: App, db_path: Path) -> list[str]:
+    if not db_path.exists():
+        return [f"- schema drift: not initialized ({db_path})"]
+    try:
+        database = sqlite3.connect(db_path)
+        database.row_factory = sqlite3.Row
+        try:
+            table = database.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sl_migrations'"
+            ).fetchone()
+            if table is None:
+                return [f"- schema drift: not initialized ({db_path})"]
+            row = database.execute(
+                "SELECT schema_hash FROM sl_migrations WHERE version = ?",
+                [1],
+            ).fetchone()
+            if row is None:
+                return [f"- schema drift: not initialized ({db_path})"]
+            expected = generate_schema_hash(app)
+            actual = str(row["schema_hash"])
+            if actual == expected:
+                return [f"- schema drift: up to date ({db_path})"]
+            return [
+                f"- schema drift: drift detected ({db_path})",
+                "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
+            ]
+        finally:
+            database.close()
+    except sqlite3.Error as exc:
+        return [
+            f"- schema drift: unable to inspect ({db_path})",
+            f"- schema drift error: {exc}",
+        ]
 
 
 def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:

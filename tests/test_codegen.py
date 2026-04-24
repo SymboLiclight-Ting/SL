@@ -294,6 +294,60 @@ app HttpBody {
         server.wait(timeout=10)
 
 
+def test_generated_http_reads_request_headers(tmp_path: Path) -> None:
+    source = """
+app HeaderAuth {
+  config AdminConfig = {
+    admin_token: Text = env("ADMIN_TOKEN", "secret"),
+  }
+
+  route GET "/secure" -> Response<Text> {
+    if request.header("Authorization") == some(AdminConfig.admin_token) {
+      return response(status: 200, body: "ok")
+    } else {
+      return response(status: 401, body: "unauthorized")
+    }
+  }
+}
+"""
+    app_path = tmp_path / "header_auth.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    diagnostics = check_program(app, source_path=app_path)
+    output = tmp_path / "header_auth.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+    port = free_port()
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    server = subprocess.Popen(
+        [sys.executable, str(output), "serve", "--port", str(port)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env={**os.environ, "ADMIN_TOKEN": "secret"},
+    )
+    try:
+        wait_for_server(port)
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/secure", timeout=5)
+            raise AssertionError("expected missing auth to fail")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 401
+            assert json.loads(exc.read().decode("utf-8")) == "unauthorized"
+
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/secure",
+            headers={"Authorization": "secret"},
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            assert response.status == 200
+            assert json.loads(response.read().decode("utf-8")) == "ok"
+    finally:
+        server.terminate()
+        server.wait(timeout=10)
+
+
 def test_generated_tests_load_fixtures_and_check_golden(tmp_path: Path) -> None:
     golden_dir = tmp_path / "golden"
     golden_dir.mkdir()

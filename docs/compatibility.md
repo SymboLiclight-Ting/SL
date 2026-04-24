@@ -96,3 +96,12 @@ v0.6 hardens release and IntentSpec alignment without changing `.sl` syntax:
 - `slc test` runs the v0.6 offline IntentSpec acceptance bridge when `test from intent.acceptance` is declared,
 - `scripts/release_check.py` centralizes release smoke commands,
 - the Customer Brief Generator gallery example is additive.
+
+## v0.7 Notes
+
+v0.7 validates SL against a more realistic backend while keeping syntax changes minimal:
+
+- `request.header(name: Text) -> Option<Text>` is additive and route-only,
+- `slc doctor --db path/to/app.sqlite` is additive and read-only,
+- schema drift inspection reports status but does not migrate data,
+- the Small Admin Backend gallery example is additive.

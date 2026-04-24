@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.0
+
+- Added the Small Admin Backend gallery example for real-app validation.
+- Added route-only `request.header(name: Text) -> Option<Text>` for explicit header token checks.
+- Added read-only `slc doctor --db` schema drift inspection.
+- Added release smoke coverage for the fifth gallery app.
+- Documented v0.7 auth and migration boundaries.
+
 ## v0.6.0
 
 - Prepared `0.6.0rc1` packaging for the `v0.6.0-rc1` release candidate.

@@ -670,6 +670,8 @@ class Checker:
 
     def infer_call(self, expr: CallExpr, env: dict[str, TypeRef], *, context_kind: str | None = None) -> TypeRef:
         name = ".".join(expr.callee)
+        if expr.callee == ["request", "header"]:
+            return self.infer_request_header_call(expr, env, context_kind=context_kind or self.context_kind)
         if len(expr.callee) == 2 and expr.callee[0] in self.stores:
             return self.infer_store_call(expr, env)
         if len(expr.callee) == 1 and expr.callee[0] in {"some", "none", "ok", "err"}:
@@ -714,6 +716,31 @@ class Checker:
         else:
             self.error(f"Unknown function or constructor `{name}`.", expr.location, "Declare it before use.")
         return TypeRef("Unknown")
+
+    def infer_request_header_call(
+        self,
+        expr: CallExpr,
+        env: dict[str, TypeRef],
+        *,
+        context_kind: str,
+    ) -> TypeRef:
+        if context_kind != "route":
+            self.error(
+                "`request.header` is only allowed in route blocks.",
+                expr.location,
+                "Read HTTP headers inside a route, then pass validated values to shared logic.",
+                code="SLC080",
+            )
+        if "request" not in env:
+            self.error(
+                "`request.header` requires a route request context.",
+                expr.location,
+                "Use `request.header` only inside route bodies.",
+                code="SLC081",
+            )
+        args = self.bind_builtin_args(expr, ["name"], required=["name"])
+        self.check_bound_arg_type(args, env, "name", TypeRef("Text"), context_kind)
+        return TypeRef("Option", [TypeRef("Text")])
 
     def bind_call_args(self, expr: CallExpr, function: FunctionDecl) -> list[tuple[Arg, Param]]:
         params_by_name = {param.name: param for param in function.params}
@@ -945,7 +972,7 @@ class Checker:
         return TypeRef("Unknown")
 
     def bind_builtin_args(self, expr: CallExpr, allowed: list[str], *, required: list[str]) -> dict[str, Arg]:
-        builtin_name = expr.callee[0]
+        builtin_name = ".".join(expr.callee)
         bound: dict[str, Arg] = {}
         seen_named = False
         positional_index = 0

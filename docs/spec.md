@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.6
+# SymbolicLight Language Specification v0.7
 
-This document defines SymbolicLight v0.6 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.7 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -172,6 +172,14 @@ route POST "/todos" body CreateTodo -> Response<Todo> {
 
 `Response<T>` supports `status`, optional `headers`, and `body`. v0.4 does not support streaming, cookies, middleware, or auth.
 
+Routes may read HTTP headers through the minimal request helper:
+
+```sl
+request.header("Authorization") -> Option<Text>
+```
+
+`request.header` is route-only. It is intended for explicit token checks inside route bodies. v0.7 does not add middleware, cookies, sessions, or implicit auth policy.
+
 ### `fixture`
 
 Fixtures seed stores before each inline test:
@@ -238,6 +246,7 @@ v0.4 supports:
 - boolean operators: `&&`, `||`,
 - wrapper constructors: `some(value)`, `none()`, `ok(value)`, `err(value)`.
 - app-kit built-ins: `response`, `env`, `env_int`, `uuid`, `now`, `read_text`, and `write_text`.
+- route request helper: `request.header(name: Text) -> Option<Text>`.
 
 `read_text` may be used in commands, routes, and tests. `write_text` may be used only in commands and tests.
 
@@ -254,6 +263,7 @@ slc run <path> -- <generated-app-args>
 slc test <path>
 slc fmt <path>
 slc doctor <path>
+slc doctor <path> --db path/to/app.sqlite
 slc lsp
 slc init <dir>
 slc new api <name>
@@ -280,6 +290,8 @@ slc add route GET /items <path>
 These hints avoid adding nonstandard top-level fields to IntentSpec while still allowing doctor to compare declared routes and commands against the SL implementation.
 
 The same hints are used by `slc test` when `test from intent.acceptance` is declared. Missing hinted routes or commands fail offline acceptance. Extra routes or commands are reported as warnings.
+
+`slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and reports schema drift as `not initialized`, `up to date`, or `drift detected`. v0.7 never mutates the database and does not perform automatic migrations.
 
 ## Generated Python Contract
 

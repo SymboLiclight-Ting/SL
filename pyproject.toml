@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "symboliclight"
-version = "0.6.0rc1"
+version = "0.7.0"
 description = "Spec-native, AI-friendly application language that compiles to Python."
 readme = "README.md"
 requires-python = ">=3.11"

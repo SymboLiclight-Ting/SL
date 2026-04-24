@@ -46,6 +46,7 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
         "examples/gallery/notes-api/app.sl",
         "examples/gallery/issue-tracker/app.sl",
         "examples/gallery/customer-brief-generator/app.sl",
+        "examples/gallery/small-admin-backend/app.sl",
     ]:
         stem = Path(source).parent.name
         commands.extend(
@@ -56,6 +57,8 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
                 [python, "-m", "symboliclight.cli", "doctor", source],
             ]
         )
+        if stem == "small-admin-backend":
+            commands.append([python, "-m", "symboliclight.cli", "doctor", source, "--db", "build/small-admin-backend.sqlite"])
     if not skip_package:
         commands.append([python, "-m", "build"])
         commands.append([python, "scripts/package_smoke.py", "--gallery"])

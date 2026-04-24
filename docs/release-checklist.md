@@ -10,6 +10,7 @@
 - Run `python -m py_compile build/todo_app.py`.
 - Run `python build/todo_app.py test`.
 - Run gallery `slc check/build/test/schema/doctor` smoke checks.
+- Run `slc doctor examples/gallery/small-admin-backend/app.sl --db build/small-admin-backend.sqlite`.
 - Run generated CLI add/list commands with a temporary SQLite database.
 - Confirm README quick start matches actual CLI behavior.
 - Confirm `slc lsp --help` is available.

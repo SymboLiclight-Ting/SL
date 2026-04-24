@@ -91,6 +91,22 @@ Deferred to later releases:
 - PyPI publishing automation,
 - migration fixtures across many historical releases.
 
+## v0.7 Real App Validation
+
+Implemented in the current mainline:
+
+- Small Admin Backend gallery example,
+- route header reads through `request.header(name: Text) -> Option<Text>`,
+- read-only `slc doctor --db` schema drift inspection,
+- release smoke coverage for five gallery examples.
+
+Deferred to later releases:
+
+- auth middleware,
+- password hashing and session management,
+- automatic database migrations,
+- richer migration planning output.
+
 ## v0.8 Ecosystem Hardening
 
 - five sample applications,

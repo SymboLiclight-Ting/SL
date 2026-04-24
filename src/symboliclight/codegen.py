@@ -44,6 +44,12 @@ def generate_python_artifact(app: App, *, generated_path: str = "<generated>") -
     return generator.generate(generated_path=generated_path)
 
 
+def generate_schema_hash(app: App) -> str:
+    if not isinstance(app, App):
+        raise TypeError("Only app files have generated schema hashes.")
+    return PythonGenerator(app).schema_hash()
+
+
 @dataclass(slots=True)
 class PythonGenerator:
     app: App
@@ -367,8 +373,14 @@ class PythonGenerator:
             "}",
             "",
             "class Request:",
-            "    def __init__(self, body=None):",
+            "    def __init__(self, body=None, headers=None):",
             "        self.body = body or {}",
+            "        self.headers = headers",
+            "",
+            "    def header(self, name):",
+            "        if self.headers is None:",
+            "            return None",
+            "        return self.headers.get(name)",
             "",
             "class Handler(BaseHTTPRequestHandler):",
             "    def do_GET(self):",
@@ -405,7 +417,7 @@ class PythonGenerator:
             "        if missing:",
             "            self.send_json(400, {'error': 'missing required body field', 'fields': missing})",
             "            return",
-            "        result = handler(Request(body))",
+            "        result = handler(Request(body, self.headers))",
             "        if isinstance(result, dict) and result.get('__sl_response__'):",
             "            self.send_json(result.get('status', 200), result.get('body'), result.get('headers', {}))",
             "            return",
@@ -559,6 +571,9 @@ class PythonGenerator:
         return parts[0]
 
     def call_expr(self, expr: CallExpr) -> str:
+        if expr.callee == ["request", "header"]:
+            args = ", ".join(self.arg_expr(arg) for arg in expr.args)
+            return f"request.header({args})"
         if len(expr.callee) == 2 and expr.callee[0] in {store.name for store in self.app.stores}:
             store, method = expr.callee
             args = ", ".join(self.arg_expr(arg) for arg in expr.args)

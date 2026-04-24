@@ -1,6 +1,6 @@
-# SymbolicLight v0.6 Semantics
+# SymbolicLight v0.7 Semantics
 
-SymbolicLight v0.6 is an application language that compiles to Python.
+SymbolicLight v0.7 is an application language that compiles to Python.
 
 ## Unit Boundary
 
@@ -58,6 +58,8 @@ Supported store methods:
 
 Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.4 does not automatically migrate data.
 
+`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only and returns one of three states: `not initialized`, `up to date`, or `drift detected`. Drift reports include a manual migration suggestion; v0.7 never modifies application data.
+
 ## Request Body Semantics
 
 Routes may declare `body TypeName` for typed JSON request bodies. `GET` and `DELETE` routes may not declare a body in v0.4.
@@ -65,6 +67,12 @@ Routes may declare `body TypeName` for typed JSON request bodies. `GET` and `DEL
 When a route has a body type, `request.body.field` is checked against that record type. Generated Python returns `400` for malformed JSON and for missing required non-optional body fields.
 
 Routes without a declared body keep the v0.3 compatibility behavior where `request.body.field` is treated as `Text`.
+
+## Request Header Semantics
+
+Routes may call `request.header(name: Text) -> Option<Text>` to read an HTTP header. The helper is route-only and is checked as an explicit boundary operation. It returns `some(text)` when the header is present and `none()` when absent, represented as `Text` or `None` in generated Python.
+
+v0.7 intentionally does not add auth middleware, cookies, sessions, password handling, or implicit authorization policy. Applications must keep token checks visible in route logic.
 
 ## Fixture And Golden Test Semantics
 
