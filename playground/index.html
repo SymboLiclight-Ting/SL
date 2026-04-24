@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SL Playground</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #f7f7f4;
+        color: #1f2428;
+      }
+      header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #ddd8ce;
+        background: #ffffff;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        padding: 12px;
+        height: calc(100vh - 70px);
+        box-sizing: border-box;
+      }
+      textarea, pre {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        border: 1px solid #d2cec4;
+        border-radius: 6px;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 13px;
+        background: #ffffff;
+        overflow: auto;
+      }
+      button {
+        margin-left: 12px;
+        padding: 8px 12px;
+        border: 1px solid #b7b0a2;
+        border-radius: 6px;
+        background: #244d4a;
+        color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>SL Playground</strong>
+      <button id="compile">Compile</button>
+    </header>
+    <main>
+      <textarea id="source">app Demo {
+  route GET "/hello" -> Text {
+    return "hello"
+  }
+}
+</textarea>
+      <pre id="output"></pre>
+    </main>
+    <script>
+      const source = document.getElementById("source");
+      const output = document.getElementById("output");
+      document.getElementById("compile").addEventListener("click", async () => {
+        output.textContent = "Compiling...";
+        const response = await fetch("/compile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: source.value })
+        });
+        const payload = await response.json();
+        output.textContent = payload.ok ? payload.python : JSON.stringify(payload.diagnostics, null, 2);
+      });
+    </script>
+  </body>
+</html>

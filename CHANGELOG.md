@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.0
+
+- Added `slc lsp` with developer-preview diagnostics, hover, definition, document symbols, and formatting support.
+- Added a local VS Code preview extension for `.sl` syntax highlighting, snippets, and LSP startup.
+- Strengthened `slc init`, `slc new api`, and `slc add route` project-generation behavior.
+- Added the SL example gallery for Todo, Notes, and Issue Tracker samples.
+- Added a local playground that compiles `.sl` source to Python or diagnostics JSON.
+- Documented the public developer preview status and SL naming convention.
+
 ## v0.4.0
 
 - Added typed route request bodies with `body TypeName`.

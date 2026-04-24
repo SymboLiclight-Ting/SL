@@ -27,9 +27,11 @@ Naming convention:
 - `src/symboliclight/codegen.py` emits single-file Python apps.
 - `src/symboliclight/schema.py` emits JSON schema metadata for `.sl` apps.
 - `src/symboliclight/formatter.py` defines the official formatter.
-- `src/symboliclight/cli.py` provides `slc check/build/schema/run/test/fmt/doctor/init/new/add`.
+- `src/symboliclight/lsp.py` provides the developer-preview language server.
+- `src/symboliclight/cli.py` provides `slc check/build/schema/run/test/fmt/doctor/lsp/init/new/add`.
 - `examples/todo_app.sl` is the smoke-test app.
 - `examples/issue_tracker.sl` covers imports, modules, enums, and `Option<T>`.
+- `examples/gallery/` contains public-preview sample applications.
 
 ## v0 Language Scope
 

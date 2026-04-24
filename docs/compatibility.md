@@ -77,3 +77,12 @@ v0.4 adds the Standard App Kit while keeping v0.3 programs valid:
 - generated Python records schema drift metadata but does not migrate data.
 
 These additions are experimental until `v1.0`.
+
+## v0.5 Notes
+
+v0.5 is a public developer preview focused on tooling:
+
+- `slc lsp` is additive and experimental,
+- `slc init` and `slc new api` now generate project directories with `src/app.sl` and `intent/*.intent.yaml`,
+- `slc add route` is stricter and refuses to edit files with `//` comments or parser errors,
+- VS Code, playground, and gallery files are developer-preview assets and are not v1.0 compatibility commitments.

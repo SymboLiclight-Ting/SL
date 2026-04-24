@@ -1,0 +1,62 @@
+{
+  "app": {
+    "prefix": "app",
+    "body": [
+      "app ${1:AppName} {",
+      "  $0",
+      "}"
+    ],
+    "description": "Create an SL app"
+  },
+  "type": {
+    "prefix": "type",
+    "body": [
+      "type ${1:Item} = {",
+      "  id: Id<${1:Item}>,",
+      "  ${2:title}: ${3:Text},",
+      "}"
+    ],
+    "description": "Create a record type"
+  },
+  "store": {
+    "prefix": "store",
+    "body": "store ${1:items}: ${2:Item}",
+    "description": "Create a SQLite-backed store"
+  },
+  "command": {
+    "prefix": "command",
+    "body": [
+      "command ${1:add}(${2:title}: ${3:Text}) -> ${4:Item} {",
+      "  $0",
+      "}"
+    ],
+    "description": "Create a CLI command"
+  },
+  "route GET": {
+    "prefix": "routeget",
+    "body": [
+      "route GET \"${1:/items}\" -> ${2:List<Item>} {",
+      "  $0",
+      "}"
+    ],
+    "description": "Create a GET route"
+  },
+  "route POST body": {
+    "prefix": "routepost",
+    "body": [
+      "route POST \"${1:/items}\" body ${2:CreateItem} -> Response<${3:Item}> {",
+      "  $0",
+      "}"
+    ],
+    "description": "Create a POST route with a typed body"
+  },
+  "test": {
+    "prefix": "test",
+    "body": [
+      "test \"${1:works}\" {",
+      "  assert ${2:true} == true",
+      "}"
+    ],
+    "description": "Create an inline test"
+  }
+}

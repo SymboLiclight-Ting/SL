@@ -31,6 +31,20 @@ def test_cli_notes_example_v04_regression(tmp_path: Path) -> None:
     assert main(["test", str(source)]) == 0
 
 
+def test_cli_gallery_examples_v05_regression(tmp_path: Path) -> None:
+    for name in ["todo-api-cli", "notes-api", "issue-tracker"]:
+        source = ROOT / "examples" / "gallery" / name / "app.sl"
+        output = tmp_path / f"{name}.py"
+        schema = tmp_path / f"{name}.schema.json"
+
+        assert main(["check", str(source)]) == 0
+        assert main(["build", str(source), "--out", str(output)]) == 0
+        py_compile.compile(str(output), doraise=True)
+        assert main(["test", str(source)]) == 0
+        assert main(["schema", str(source), "--out", str(schema)]) == 0
+        assert main(["doctor", str(source)]) == 0
+
+
 def test_cli_schema_and_doctor_report_v04_status(tmp_path: Path, capsys) -> None:
     source = tmp_path / "app.sl"
     output = tmp_path / "schema.json"
@@ -112,16 +126,43 @@ def test_cli_fmt_doctor_init_new_and_add_route(tmp_path: Path, monkeypatch) -> N
     assert main(["fmt", str(source), "--check"]) == 0
     assert main(["doctor", str(source)]) == 0
     assert main(["add", "route", "GET", "/health", str(source)]) == 0
+    assert main(["fmt", str(source), "--check"]) == 0
 
     project = tmp_path / "demo"
     assert main(["init", str(project)]) == 0
-    assert (project / "app.sl").exists()
-    assert main(["check", str(project / "app.sl")]) == 0
+    assert (project / "src" / "app.sl").exists()
+    assert (project / "intent" / "app.intent.yaml").exists()
+    assert (project / ".gitignore").exists()
+    assert main(["check", str(project / "src" / "app.sl")]) == 0
 
     monkeypatch.chdir(tmp_path)
     assert main(["new", "api", "sample"]) == 0
-    assert (tmp_path / "sample.sl").exists()
-    assert main(["check", str(tmp_path / "sample.sl")]) == 0
+    sample_source = tmp_path / "sample" / "src" / "app.sl"
+    sample_output = tmp_path / "sample" / "build" / "app.py"
+    sample_schema = tmp_path / "sample" / "build" / "schema.json"
+    assert sample_source.exists()
+    assert main(["check", str(sample_source)]) == 0
+    assert main(["build", str(sample_source), "--out", str(sample_output)]) == 0
+    py_compile.compile(str(sample_output), doraise=True)
+    assert main(["test", str(sample_source)]) == 0
+    assert main(["schema", str(sample_source), "--out", str(sample_schema)]) == 0
+    assert main(["doctor", str(sample_source)]) == 0
+
+
+def test_cli_add_route_refuses_commented_files(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    original = """
+// keep this note
+app Commented {
+  route GET "/ok" -> Text {
+    return "ok"
+  }
+}
+""".lstrip()
+    source.write_text(original, encoding="utf-8")
+
+    assert main(["add", "route", "GET", "/health", str(source)]) == 1
+    assert source.read_text(encoding="utf-8") == original
 
 
 def test_cli_fmt_refuses_to_drop_comments(tmp_path: Path) -> None:

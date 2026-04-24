@@ -1,6 +1,6 @@
-# SymbolicLight v0.4 Semantics
+# SymbolicLight v0.5 Semantics
 
-SymbolicLight v0.4 is an application language that compiles to Python.
+SymbolicLight v0.5 is an application language that compiles to Python.
 
 ## Unit Boundary
 
@@ -125,6 +125,12 @@ Compiler diagnostics carry a stable shape for tools and AI repair loops:
 
 ## Formatting Boundary
 
-The v0.4 formatter is the official style source for comment-free `.sl` files.
+The v0.5 formatter is the official style source for comment-free `.sl` files.
 
-Files containing `//` comments are not rewritten in v0.4. The formatter exits with an error instead of deleting comments, because comment-preserving formatting requires lexer trivia support.
+Files containing `//` comments are not rewritten in v0.5. The formatter exits with an error instead of deleting comments, because comment-preserving formatting requires lexer trivia support.
+
+## Developer Preview Tooling
+
+`slc lsp` exposes compiler diagnostics and basic source navigation through JSON-RPC over stdio. The LSP does not change language semantics; it reuses the parser, checker, and formatter.
+
+The local playground compiles submitted `.sl` source to Python or diagnostics JSON. It is a preview tool and not a production runtime.

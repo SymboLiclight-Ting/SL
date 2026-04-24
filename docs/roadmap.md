@@ -58,13 +58,21 @@ Deferred to later releases:
 
 ## v0.5 Public Developer Preview
 
-Developer experience:
+Implemented in the current mainline:
 
 - VS Code syntax package,
 - initial LSP diagnostics, hover, definitions, document symbols, and formatting,
 - example gallery,
 - local playground that shows `.sl` input, generated Python, and diagnostics,
 - three complete sample apps.
+
+Deferred to later releases:
+
+- publishing the VS Code extension to the marketplace,
+- full semantic token support,
+- comment-preserving formatter trivia,
+- hosted playground,
+- richer refactoring actions.
 
 ## v0.8 Ecosystem Hardening
 

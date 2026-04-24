@@ -13,8 +13,10 @@ from symboliclight.checker import check_program_result
 from symboliclight.codegen import generate_python, generate_python_artifact
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError, raise_if_errors
 from symboliclight.formatter import format_unit
+from symboliclight.lsp import run_lsp_server
 from symboliclight.parser import parse_source, parse_source_result
 from symboliclight.schema import generate_schema
+from symboliclight.cli_support import contains_line_comment_source
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser = sub.add_parser("doctor")
     doctor_parser.add_argument("source")
     doctor_parser.add_argument("--strict-intent", action="store_true")
+
+    sub.add_parser("lsp")
 
     init_parser = sub.add_parser("init")
     init_parser.add_argument("directory")
@@ -147,13 +151,16 @@ def main(argv: list[str] | None = None) -> int:
             print_diagnostics(diagnostics)
             print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit))
             return 1 if any(diagnostic.severity == "error" for diagnostic in diagnostics) else 0
+        if args.command == "lsp":
+            run_lsp_server()
+            return 0
         if args.command == "init":
             init_project(Path(args.directory))
             print(f"initialized {args.directory}")
             return 0
         if args.command == "new" and args.new_kind == "api":
             new_api_project(args.name, Path.cwd())
-            print(f"created {args.name}.sl")
+            print(f"created {args.name}")
             return 0
         if args.command == "add" and args.add_kind == "route":
             source = Path(args.source) if args.source else discover_source(Path.cwd())
@@ -237,21 +244,7 @@ def format_file(source_path: Path, *, check_only: bool) -> int:
 
 
 def contains_line_comment(source: str) -> bool:
-    in_string = False
-    escaped = False
-    for index, char in enumerate(source):
-        if escaped:
-            escaped = False
-            continue
-        if char == "\\" and in_string:
-            escaped = True
-            continue
-        if char == '"':
-            in_string = not in_string
-            continue
-        if not in_string and char == "/" and index + 1 < len(source) and source[index + 1] == "/":
-            return True
-    return False
+    return contains_line_comment_source(source)
 
 
 def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, *, cache_hit: bool) -> str:
@@ -295,26 +288,52 @@ def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, 
 def init_project(directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     app_name = directory.name.replace("-", "_").replace(" ", "_").title().replace("_", "")
-    source = directory / "app.sl"
-    intent = directory / "app.intent.yaml"
+    source_dir = directory / "src"
+    intent_dir = directory / "intent"
+    source_dir.mkdir(exist_ok=True)
+    intent_dir.mkdir(exist_ok=True)
+    source = source_dir / "app.sl"
+    intent = intent_dir / "app.intent.yaml"
     readme = directory / "README.md"
-    write_new_file(source, sample_app(app_name, "./app.intent.yaml"))
+    gitignore = directory / ".gitignore"
+    write_new_file(source, sample_app(app_name, "../intent/app.intent.yaml"))
     write_new_file(intent, sample_intent(app_name))
-    write_new_file(readme, f"# {app_name}\n\nRun `slc check app.sl`.\n")
+    write_new_file(readme, f"# {app_name}\n\nRun `slc check src/app.sl`.\n")
+    write_new_file(gitignore, ".slcache/\nbuild/\n*.sqlite\n__pycache__/\n")
 
 
 def new_api_project(name: str, directory: Path) -> None:
     app_name = name.replace("-", "_").replace(" ", "_").title().replace("_", "")
-    source = directory / f"{name}.sl"
-    intent = directory / f"{name}.intent.yaml"
-    write_new_file(source, sample_app(app_name, f"./{name}.intent.yaml"))
+    project = directory / name
+    project.mkdir(parents=True, exist_ok=True)
+    source_dir = project / "src"
+    intent_dir = project / "intent"
+    source_dir.mkdir(exist_ok=True)
+    intent_dir.mkdir(exist_ok=True)
+    source = source_dir / "app.sl"
+    intent = intent_dir / f"{name}.intent.yaml"
+    readme = project / "README.md"
+    gitignore = project / ".gitignore"
+    write_new_file(source, sample_app(app_name, f"../intent/{name}.intent.yaml"))
     write_new_file(intent, sample_intent(app_name))
+    write_new_file(readme, f"# {app_name}\n\nRun `slc check src/app.sl`.\n")
+    write_new_file(gitignore, ".slcache/\nbuild/\n*.sqlite\n__pycache__/\n")
 
 
 def add_route_to_file(source_path: Path, method: str, route_path: str) -> None:
     source = source_path.read_text(encoding="utf-8")
+    if contains_line_comment(source):
+        raise OSError(f"Refusing to edit {source_path}: // comments require comment-preserving edits.")
+    parse_result = parse_source_result(source, path=str(source_path))
+    if parse_result.unit is None or any(diagnostic.severity == "error" for diagnostic in parse_result.diagnostics):
+        raise OSError(f"Refusing to edit {source_path}: fix parse errors before adding a route.")
+    if not isinstance(parse_result.unit, App):
+        raise OSError(f"Refusing to edit {source_path}: routes can only be added to app files.")
+    method = method.upper()
+    if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+        raise OSError("Unsupported route method. Use GET, POST, PUT, PATCH, or DELETE.")
     insertion = (
-        f'\n  route {method.upper()} "{route_path}" -> Text {{\n'
+        f'\n  route {method} "{route_path}" -> Text {{\n'
         '    return ""\n'
         "  }\n"
     )

@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.4 compiler supports:
+The v0.5 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -41,6 +41,9 @@ The v0.4 compiler supports:
 - source-map sidecars and best-effort `.sl` runtime backreferences.
 - incremental `slc check` cache reuse.
 - JSON diagnostics for tools through `slc check --json`.
+- developer-preview LSP through `slc lsp`.
+- local VS Code syntax, snippets, and language-server wiring under `editors/vscode`.
+- local playground under `playground/`.
 
 ## Quick Start
 
@@ -52,6 +55,7 @@ slc build examples/todo_app.sl --out build/todo_app.py
 slc schema examples/notes_api.sl --out build/notes_schema.json
 slc fmt examples/todo_app.sl --check
 slc doctor examples/todo_app.sl
+slc lsp
 python build/todo_app.py test
 python build/todo_app.py add "Buy milk"
 python build/todo_app.py list
@@ -156,6 +160,7 @@ slc run <file.sl> -- add "Buy milk"
 slc test <file.sl>
 slc fmt <file.sl>
 slc doctor <file.sl>
+slc lsp
 slc init <dir>
 slc new api <name>
 slc add route GET /items <file.sl>
@@ -163,4 +168,4 @@ slc add route GET /items <file.sl>
 
 ## Project Status
 
-This is an early MVP. The goal is to prove that a spec-native application language can compile into readable, runnable Python while keeping source code compact and AI-friendly.
+This is a public developer preview. The goal is to prove that a spec-native application language can compile into readable, runnable Python while keeping source code compact and AI-friendly. v0.x remains experimental and may include breaking changes before v1.0.

@@ -1,0 +1,73 @@
+{
+  "scopeName": "source.sl",
+  "name": "SL",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#routes" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.sl",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.sl",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.sl",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.sl",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.sl",
+          "match": "\\b(app|module|import|as|intent|permissions|from|enum|type|config|fn|store|fixture|route|body|command|test|golden|let|return|assert|if|else)\\b"
+        },
+        {
+          "name": "constant.language.boolean.sl",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.sl",
+          "match": "\\b(Bool|Int|Float|Text|Id|List|Option|Result|Response|Request)\\b"
+        }
+      ]
+    },
+    "routes": {
+      "patterns": [
+        {
+          "name": "entity.name.function.route.sl",
+          "match": "\\b(GET|POST|PUT|PATCH|DELETE)\\b"
+        }
+      ]
+    }
+  }
+}
