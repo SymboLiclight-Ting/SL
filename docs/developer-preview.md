@@ -1,6 +1,6 @@
 # SL v0.5 Developer Preview
 
-SL v0.5 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
+SL v0.6 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
 
 ## What Is Ready
 
@@ -9,6 +9,7 @@ SL v0.5 is a public developer preview. It is usable for experiments, examples, a
 - Use SQLite stores, typed routes, fixtures, golden tests, and JSON schema generation.
 - Run `slc lsp` for editor diagnostics and basic navigation.
 - Try the local VS Code preview extension and playground.
+- Run `slc doctor` to compare SL route and command hints against implementation.
 
 ## What Is Not Stable Yet
 
@@ -25,4 +26,5 @@ slc check examples/notes_api.sl
 slc build examples/notes_api.sl --out build/notes_api.py
 python -m py_compile build/notes_api.py
 python build/notes_api.py test
+python scripts/release_check.py --skip-package
 ```

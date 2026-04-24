@@ -1,6 +1,6 @@
-# SymbolicLight v0.5 Semantics
+# SymbolicLight v0.6 Semantics
 
-SymbolicLight v0.5 is an application language that compiles to Python.
+SymbolicLight v0.6 is an application language that compiles to Python.
 
 ## Unit Boundary
 
@@ -134,3 +134,14 @@ Files containing `//` comments are not rewritten in v0.5. The formatter exits wi
 `slc lsp` exposes compiler diagnostics and basic source navigation through JSON-RPC over stdio. The LSP does not change language semantics; it reuses the parser, checker, and formatter.
 
 The local playground compiles submitted `.sl` source to Python or diagnostics JSON. It is a preview tool and not a production runtime.
+
+## IntentSpec Doctor Hints
+
+`slc doctor` may read SL-specific hints from IntentSpec comments:
+
+```yaml
+# sl: route GET /items
+# sl: command add
+```
+
+The comments are intentionally outside the IntentSpec schema. They let SL compare implementation routes and commands without making IntentSpec validation fail in stricter environments.

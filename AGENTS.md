@@ -25,6 +25,7 @@ Naming convention:
 - `src/symboliclight/parser.py` builds the AST.
 - `src/symboliclight/checker.py` validates v0 semantics.
 - `src/symboliclight/codegen.py` emits single-file Python apps.
+- `src/symboliclight/intent.py` reads lightweight IntentSpec doctor hints.
 - `src/symboliclight/schema.py` emits JSON schema metadata for `.sl` apps.
 - `src/symboliclight/formatter.py` defines the official formatter.
 - `src/symboliclight/lsp.py` provides the developer-preview language server.
@@ -32,6 +33,7 @@ Naming convention:
 - `examples/todo_app.sl` is the smoke-test app.
 - `examples/issue_tracker.sl` covers imports, modules, enums, and `Option<T>`.
 - `examples/gallery/` contains public-preview sample applications.
+- `scripts/release_check.py` runs release smoke checks.
 
 ## v0 Language Scope
 

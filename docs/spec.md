@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.5
+# SymbolicLight Language Specification v0.6
 
-This document defines SymbolicLight v0.5 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.6 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -265,6 +265,15 @@ slc add route GET /items <path>
 `slc lsp` starts the developer-preview JSON-RPC language server over stdio. v0.5 supports diagnostics, hover, definition, document symbols, and formatting.
 
 `slc init <dir>` creates `src/app.sl`, `intent/app.intent.yaml`, `README.md`, and `.gitignore`. `slc new api <name>` creates the same project shape under `<name>/`. `slc add route` refuses to edit files that contain `//` comments or parser errors.
+
+`slc doctor` reads optional SL-specific IntentSpec hints from comments:
+
+```yaml
+# sl: route GET /items
+# sl: command add
+```
+
+These hints avoid adding nonstandard top-level fields to IntentSpec while still allowing doctor to compare declared routes and commands against the SL implementation.
 
 ## Generated Python Contract
 

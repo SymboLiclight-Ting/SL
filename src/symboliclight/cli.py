@@ -13,6 +13,7 @@ from symboliclight.checker import check_program_result
 from symboliclight.codegen import generate_python, generate_python_artifact
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError, raise_if_errors
 from symboliclight.formatter import format_unit
+from symboliclight.intent import IntentContract, load_intent_contract
 from symboliclight.lsp import run_lsp_server
 from symboliclight.parser import parse_source, parse_source_result
 from symboliclight.schema import generate_schema
@@ -278,11 +279,113 @@ def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, 
             lines.append("- permissions: imported from intent")
         elif unit.intents:
             lines.append("- permissions: not imported")
+        for intent_path in unit.intents:
+            contract_path = (source_path.parent / intent_path).resolve()
+            if contract_path.exists():
+                lines.extend(intent_doctor_lines(unit, load_intent_contract(contract_path)))
+            else:
+                lines.append(f"- intent contract: missing {intent_path}")
     else:
         lines.append(f"- imports: {len(unit.imports)}")
         lines.append(f"- types: {len(unit.types)}")
         lines.append(f"- enums: {len(unit.enums)}")
     return "\n".join(lines)
+
+
+def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:
+    lines = [f"- intent contract: {contract.path.name}"]
+    app_routes = {(route.method, route.path) for route in app.routes}
+    intent_routes = {(route.method, route.path) for route in contract.routes}
+    if contract.routes:
+        missing = sorted(intent_routes - app_routes)
+        extra = sorted(app_routes - intent_routes)
+        lines.append(f"- intent routes: {len(app_routes & intent_routes)}/{len(intent_routes)} matched")
+        if missing:
+            lines.append("- intent missing routes: " + ", ".join(f"{method} {path}" for method, path in missing))
+        if extra:
+            lines.append("- intent extra routes: " + ", ".join(f"{method} {path}" for method, path in extra))
+    elif app.routes:
+        lines.append("- intent routes: not declared")
+    app_commands = {function.name for function in app.functions if function.kind == "command"}
+    intent_commands = set(contract.commands)
+    if contract.commands:
+        missing_commands = sorted(intent_commands - app_commands)
+        extra_commands = sorted(app_commands - intent_commands)
+        lines.append(f"- intent commands: {len(app_commands & intent_commands)}/{len(intent_commands)} matched")
+        if missing_commands:
+            lines.append("- intent missing commands: " + ", ".join(missing_commands))
+        if extra_commands:
+            lines.append("- intent extra commands: " + ", ".join(extra_commands))
+    elif app_commands:
+        lines.append("- intent commands: not declared")
+    lines.extend(permission_doctor_lines(app, contract))
+    if app.intents and not any(test.external_ref == "intent.acceptance" for test in app.tests):
+        lines.append("- intent acceptance gap: `test from intent.acceptance` not declared")
+    return lines
+
+
+def permission_doctor_lines(app: App, contract: IntentContract) -> list[str]:
+    lines: list[str] = []
+    uses_web = bool(app.routes)
+    uses_filesystem_read = app_uses_call(app, "read_text")
+    uses_filesystem_write = bool(app.stores) or app_uses_call(app, "write_text")
+    if contract.permissions.web is False and uses_web:
+        lines.append("- permission mismatch: IntentSpec permissions.web is false but app declares routes")
+    if contract.permissions.filesystem_read is False and uses_filesystem_read:
+        lines.append("- permission mismatch: IntentSpec filesystem.read is false but app reads files")
+    if contract.permissions.filesystem_write is False and uses_filesystem_write:
+        lines.append("- permission mismatch: IntentSpec filesystem.write is false but app writes local state")
+    if contract.permissions.network is False:
+        lines.append("- permission network: ok")
+    return lines
+
+
+def app_uses_call(app: App, name: str) -> bool:
+    return name in app_source_call_names(app)
+
+
+def app_source_call_names(app: App) -> set[str]:
+    names: set[str] = set()
+    for function in app.functions:
+        for statement in function.body:
+            collect_call_names_from_stmt(statement, names)
+    for route in app.routes:
+        for statement in route.body:
+            collect_call_names_from_stmt(statement, names)
+    for test in app.tests:
+        for statement in test.body:
+            collect_call_names_from_stmt(statement, names)
+    for config in app.configs:
+        for field in config.fields:
+            collect_call_names_from_expr(field.default, names)
+    return names
+
+
+def collect_call_names_from_stmt(statement, names: set[str]) -> None:
+    for attr in ("expr", "condition"):
+        expr = getattr(statement, attr, None)
+        if expr is not None:
+            collect_call_names_from_expr(expr, names)
+    for body_attr in ("then_body", "else_body"):
+        for nested in getattr(statement, body_attr, []) or []:
+            collect_call_names_from_stmt(nested, names)
+
+
+def collect_call_names_from_expr(expr, names: set[str]) -> None:
+    callee = getattr(expr, "callee", None)
+    if callee:
+        names.add(".".join(callee))
+        names.add(callee[-1])
+    for attr in ("left", "right"):
+        nested = getattr(expr, attr, None)
+        if nested is not None:
+            collect_call_names_from_expr(nested, names)
+    for item in getattr(expr, "items", []) or []:
+        collect_call_names_from_expr(item, names)
+    for arg in getattr(expr, "args", []) or []:
+        collect_call_names_from_expr(arg.expr, names)
+    for field in getattr(expr, "fields", []) or []:
+        collect_call_names_from_expr(field.expr, names)
 
 
 def init_project(directory: Path) -> None:

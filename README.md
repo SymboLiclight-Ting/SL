@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.5 developer preview supports:
+The v0.6 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -44,6 +44,8 @@ The v0.5 developer preview supports:
 - developer-preview LSP through `slc lsp`.
 - local VS Code syntax, snippets, and language-server wiring under `editors/vscode`.
 - local playground under `playground/`.
+- IntentSpec-aware `slc doctor` route, command, and permission alignment hints.
+- repeatable release smoke checks through `scripts/release_check.py`.
 
 ## Quick Start
 
@@ -164,6 +166,12 @@ slc lsp
 slc init <dir>
 slc new api <name>
 slc add route GET /items <file.sl>
+```
+
+## Release Check
+
+```bash
+python scripts/release_check.py --skip-package
 ```
 
 ## Project Status

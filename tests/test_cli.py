@@ -32,7 +32,7 @@ def test_cli_notes_example_v04_regression(tmp_path: Path) -> None:
 
 
 def test_cli_gallery_examples_v05_regression(tmp_path: Path) -> None:
-    for name in ["todo-api-cli", "notes-api", "issue-tracker"]:
+    for name in ["todo-api-cli", "notes-api", "issue-tracker", "customer-brief-generator"]:
         source = ROOT / "examples" / "gallery" / name / "app.sl"
         output = tmp_path / f"{name}.py"
         schema = tmp_path / f"{name}.schema.json"
@@ -43,6 +43,86 @@ def test_cli_gallery_examples_v05_regression(tmp_path: Path) -> None:
         assert main(["test", str(source)]) == 0
         assert main(["schema", str(source), "--out", str(schema)]) == 0
         assert main(["doctor", str(source)]) == 0
+
+
+def test_cli_doctor_reports_intent_route_command_and_permission_diff(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    intent = tmp_path / "app.intent.yaml"
+    source.write_text(
+        """
+app DoctorDemo {
+  intent "./app.intent.yaml"
+
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+
+  command add(title: Text) -> Item {
+    return items.insert({ title: title })
+  }
+
+  route GET "/items" -> List<Item> {
+    return items.all()
+  }
+}
+""",
+        encoding="utf-8",
+    )
+    intent.write_text(
+        """
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /missing
+# sl: command add
+# sl: command remove
+
+metadata:
+  name: "doctor-demo"
+  title: "Doctor Demo"
+  owner: "symboliclight"
+
+task:
+  goal: "Check doctor diffs."
+  audience:
+    - "Application developer"
+  priority: "medium"
+
+permissions:
+  web: false
+  filesystem:
+    read: true
+    write: false
+  network: false
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 500
+  sections:
+    - "Run"
+
+tests:
+  - name: "Doctor smoke"
+    assert:
+      - type: "required_sections"
+
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["doctor", str(source)]) == 0
+    output = capsys.readouterr().out
+
+    assert "intent missing routes: GET /missing" in output
+    assert "intent extra routes: GET /items" in output
+    assert "intent commands: 1/2 matched" in output
+    assert "intent missing commands: remove" in output
+    assert "permissions.web is false" in output
+    assert "filesystem.write is false" in output
 
 
 def test_cli_schema_and_doctor_report_v04_status(tmp_path: Path, capsys) -> None:

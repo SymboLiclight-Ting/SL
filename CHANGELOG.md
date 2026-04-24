@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.0
+
+- Added IntentSpec-aware `slc doctor` diffing for SL route and command hints.
+- Added permission mismatch reporting for routes, local state writes, and file reads/writes.
+- Added `scripts/release_check.py` for repeatable release smoke checks.
+- Added the Customer Brief Generator gallery example.
+- Documented v0.6 release hardening behavior.
+
 ## v0.5.0
 
 - Added `slc lsp` with developer-preview diagnostics, hover, definition, document symbols, and formatting support.

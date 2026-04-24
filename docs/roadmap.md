@@ -74,6 +74,22 @@ Deferred to later releases:
 - hosted playground,
 - richer refactoring actions.
 
+## v0.6 IntentSpec And Release Hardening
+
+Implemented in the current mainline:
+
+- IntentSpec-aware `slc doctor` route and command diffing through `# sl:` hints,
+- permission mismatch reporting for routes, file reads, and local state writes,
+- repeatable release smoke checks through `scripts/release_check.py`,
+- Customer Brief Generator gallery example.
+
+Deferred to later releases:
+
+- executing IntentSpec acceptance tests directly,
+- full structured IntentSpec route schemas once IntentSpec supports those fields,
+- PyPI publishing automation,
+- migration fixtures across many historical releases.
+
 ## v0.8 Ecosystem Hardening
 
 - five sample applications,

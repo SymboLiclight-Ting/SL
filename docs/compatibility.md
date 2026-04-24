@@ -86,3 +86,12 @@ v0.5 is a public developer preview focused on tooling:
 - `slc init` and `slc new api` now generate project directories with `src/app.sl` and `intent/*.intent.yaml`,
 - `slc add route` is stricter and refuses to edit files with `//` comments or parser errors,
 - VS Code, playground, and gallery files are developer-preview assets and are not v1.0 compatibility commitments.
+
+## v0.6 Notes
+
+v0.6 hardens release and IntentSpec alignment without changing `.sl` syntax:
+
+- `slc doctor` reads optional `# sl:` hints in IntentSpec files,
+- doctor reports route, command, and permission alignment gaps as report lines, not compiler errors,
+- `scripts/release_check.py` centralizes release smoke commands,
+- the Customer Brief Generator gallery example is additive.

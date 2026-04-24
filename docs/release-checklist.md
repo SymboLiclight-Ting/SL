@@ -11,3 +11,4 @@
 - Run generated CLI add/list commands with a temporary SQLite database.
 - Confirm README quick start matches actual CLI behavior.
 - Confirm `slc lsp --help` is available.
+- Run `python scripts/release_check.py --skip-package`.

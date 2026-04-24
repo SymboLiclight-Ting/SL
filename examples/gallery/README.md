@@ -17,3 +17,4 @@ slc doctor app.sl
 - `todo-api-cli`: Todo API + CLI smoke app.
 - `notes-api`: typed route bodies, fixtures, golden tests, and schema generation.
 - `issue-tracker`: explicit imports, enum status, filtering, and IntentSpec declarations.
+- `customer-brief-generator`: command alignment, file input, and Markdown output.
