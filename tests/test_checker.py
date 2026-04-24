@@ -394,6 +394,63 @@ app Bad {
     assert any("Return type mismatch" in diagnostic.message for diagnostic in diagnostics)
 
 
+def test_checker_rejects_response_record_literal_missing_field() -> None:
+    source = """
+app Bad {
+  type PublicTodo = {
+    title: Text,
+    done: Bool,
+  }
+
+  route GET "/todo" -> Response<PublicTodo> {
+    return response(status: 200, body: { title: "Buy milk" })
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Missing required field `done`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_response_record_literal_unknown_field() -> None:
+    source = """
+app Bad {
+  type PublicTodo = {
+    title: Text,
+    done: Bool,
+  }
+
+  route GET "/todo" -> Response<PublicTodo> {
+    return response(status: 200, body: { title: "Buy milk", done: false, extra: true })
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("has no field `extra`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_accepts_response_record_literal_matching_target() -> None:
+    source = """
+app Good {
+  type PublicTodo = {
+    title: Text,
+    done: Bool,
+  }
+
+  route GET "/todo" -> Response<PublicTodo> {
+    return response(status: 200, body: { title: "Buy milk", done: false })
+  }
+}
+"""
+    app = parse_source(source, path="good.sl")
+    diagnostics = check_program(app, source_path=Path("good.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
 def test_checker_accepts_request_header_in_routes() -> None:
     source = """
 app Good {

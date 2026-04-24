@@ -519,13 +519,8 @@ class Checker:
                 if isinstance(statement, LetStmt):
                     env[statement.name] = self.infer_expr(statement.expr, env, context_kind=context_kind)
                 elif isinstance(statement, ReturnStmt):
-                    if expected_return is not None and isinstance(statement.expr, RecordExpr):
-                        self.validate_record_expr(
-                            statement.expr,
-                            expected_return,
-                            allow_missing_id=False,
-                            env=env,
-                        )
+                    if expected_return is not None:
+                        self.validate_targeted_return_expr(statement.expr, expected_return, env)
                     actual = self.infer_expr(statement.expr, env, context_kind=context_kind)
                     if expected_return is not None and not self.type_matches(expected_return, actual):
                         self.error(
@@ -557,6 +552,51 @@ class Checker:
                     self.infer_expr(statement.expr, env, context_kind=context_kind)
         finally:
             self.context_kind = previous_context
+
+    def validate_targeted_return_expr(
+        self,
+        expr: Expr,
+        expected_return: TypeRef,
+        env: dict[str, TypeRef],
+    ) -> None:
+        if isinstance(expr, RecordExpr):
+            self.validate_record_expr(
+                expr,
+                expected_return,
+                allow_missing_id=False,
+                env=env,
+            )
+            return
+        response_body = self.response_body_expr(expr)
+        if response_body is None or not isinstance(response_body, RecordExpr):
+            return
+        target = self.response_body_target(expected_return)
+        if target is None:
+            return
+        self.validate_record_expr(
+            response_body,
+            target,
+            allow_missing_id=False,
+            env=env,
+        )
+
+    def response_body_target(self, expected_return: TypeRef) -> TypeRef | None:
+        if expected_return.name != "Response" or not expected_return.args:
+            return None
+        return expected_return.args[0]
+
+    def response_body_expr(self, expr: Expr) -> Expr | None:
+        if not isinstance(expr, CallExpr) or expr.callee != ["response"]:
+            return None
+        positional_index = 0
+        for arg in expr.args:
+            if arg.name == "body":
+                return arg.expr
+            if arg.name is None:
+                if positional_index == 1:
+                    return arg.expr
+                positional_index += 1
+        return None
 
     def infer_expr(self, expr: Expr, env: dict[str, TypeRef], *, context_kind: str | None = None) -> TypeRef:
         if isinstance(expr, LiteralExpr):
