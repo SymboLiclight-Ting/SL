@@ -123,6 +123,7 @@ tests:
     assert "intent missing commands: remove" in output
     assert "permissions.web is false" in output
     assert "filesystem.write is false" in output
+    assert "permission network: ok" in output
 
 
 def test_cli_schema_and_doctor_report_v04_status(tmp_path: Path, capsys) -> None:

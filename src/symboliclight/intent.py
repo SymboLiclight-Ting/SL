@@ -80,6 +80,8 @@ def load_intent_contract(path: Path) -> IntentContract:
                 continue
             key, value = split_key_value(stripped)
             parsed = parse_bool(value)
+            if indent == 2:
+                permissions_child = None
             if permissions_child == "filesystem":
                 if key == "read":
                     contract.permissions.filesystem_read = parsed
