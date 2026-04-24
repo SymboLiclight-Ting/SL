@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.7
+# SymbolicLight Language Specification v0.8
 
-This document defines SymbolicLight v0.7 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.8 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -99,6 +99,7 @@ todos.insert(record) -> Todo
 todos.all() -> List<Todo>
 todos.get(id) -> Option<Todo>
 todos.update(id, record) -> Todo
+todos.try_update(id, record) -> Option<Todo>
 todos.delete(id) -> Bool
 todos.filter(field: value) -> List<Todo>
 todos.count() -> Int
@@ -111,6 +112,8 @@ todos.clear() -> Int
 `get`, `update`, and `delete` require an `Int` or `Id<T>` id argument. `Id<T>` parameters at CLI boundaries are parsed as integers in generated Python. The checker accepts `Int` for compatibility but suggests `Id<T>` for named id values where it can preserve store identity.
 
 `update(id, record)` returns `T` and raises a generated runtime error if the id does not exist.
+
+`try_update(id, record)` returns `Option<T>` and produces `none()` when the id does not exist.
 
 `filter` requires named arguments and validates each filter value against the matching record field type. Other store methods use positional arguments.
 
@@ -174,13 +177,15 @@ route POST "/todos" body CreateTodo -> Response<Todo> {
 
 `Response<T>` supports `status`, optional `headers`, and `body`. v0.4 does not support streaming, cookies, middleware, or auth.
 
+`response_ok(status: Int, body: T)` returns `Response<Result<T, ErrorBody>>`. `response_err(status: Int, code: Text, message: Text)` returns an error response using an `ErrorBody`-style record with `code: Text` and `message: Text`. These helpers do not introduce generic function syntax; their target types are checked from the enclosing route return type.
+
 Routes may read HTTP headers through the minimal request helper:
 
 ```sl
 request.header("Authorization") -> Option<Text>
 ```
 
-`request.header` is route-only. It is intended for explicit token checks inside route bodies. v0.7 does not add middleware, cookies, sessions, or implicit auth policy.
+`request.header` is route-only. It is intended for explicit token checks inside route bodies. v0.8 does not add middleware, cookies, sessions, or implicit auth policy.
 
 ### `fixture`
 
@@ -247,7 +252,7 @@ v0.4 supports:
 - comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`,
 - boolean operators: `&&`, `||`,
 - wrapper constructors: `some(value)`, `none()`, `ok(value)`, `err(value)`.
-- app-kit built-ins: `response`, `env`, `env_int`, `uuid`, `now`, `read_text`, and `write_text`.
+- app-kit built-ins: `response`, `response_ok`, `response_err`, `env`, `env_int`, `uuid`, `now`, `read_text`, and `write_text`.
 - route request helper: `request.header(name: Text) -> Option<Text>`.
 
 `read_text` may be used in commands, routes, and tests. `write_text` may be used only in commands and tests.
@@ -293,7 +298,7 @@ These hints avoid adding nonstandard top-level fields to IntentSpec while still 
 
 The same hints are used by `slc test` when `test from intent.acceptance` is declared. Missing hinted routes or commands fail offline acceptance. Extra routes or commands are reported as warnings.
 
-`slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and reports schema drift as `not initialized`, `up to date`, or `drift detected`. v0.7 never mutates the database and does not perform automatic migrations.
+`slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and reports schema drift as `not initialized`, `up to date`, or `drift detected`. When drift is detected, v0.8 also reports summary schema differences for missing or extra tables, missing or extra columns, and column type mismatches. The command never mutates the database and does not perform automatic migrations.
 
 ## Generated Python Contract
 

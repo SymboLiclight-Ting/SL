@@ -18,4 +18,4 @@ slc doctor app.sl
 - `notes-api`: typed route bodies, fixtures, golden tests, and schema generation.
 - `issue-tracker`: explicit imports, enum status, filtering, and IntentSpec declarations.
 - `customer-brief-generator`: command alignment, file input, and Markdown output.
-- `small-admin-backend`: v0.7 real-app validation for auth, config, migration checks, multiple stores, routes, and commands.
+- `small-admin-backend`: v0.8 real-app hardening for auth helper extraction, `ErrorBody`, schema diff checks, multiple stores, routes, and commands.

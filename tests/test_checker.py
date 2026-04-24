@@ -227,6 +227,48 @@ app GoodId {
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "warning"]
 
 
+def test_checker_accepts_try_update_as_optional_store_update() -> None:
+    source = """
+app TryUpdate {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command maybe_update(id: Id<Todo>) -> Option<Todo> {
+    return todos.try_update(id, { title: "updated" })
+  }
+}
+"""
+    app = parse_source(source, path="try_update.sl")
+    diagnostics = check_program(app, source_path=Path("try_update.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_try_update_non_record() -> None:
+    source = """
+app BadTryUpdate {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command bad(id: Id<Todo>) -> Option<Todo> {
+    return todos.try_update(id, "updated")
+  }
+}
+"""
+    app = parse_source(source, path="bad_try_update.sl")
+    diagnostics = check_program(app, source_path=Path("bad_try_update.sl"))
+
+    assert any("try_update requires a record literal" in diagnostic.message for diagnostic in diagnostics)
+
+
 def test_checker_rejects_named_args_for_non_filter_store_methods() -> None:
     source = """
 app Bad {
@@ -546,6 +588,105 @@ app Bad {
     diagnostics = check_program(app, source_path=Path("bad.sl"))
 
     assert any("does not accept named arguments" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_accepts_response_helpers_with_error_body() -> None:
+    source = """
+app Good {
+  type ErrorBody = {
+    code: Text,
+    message: Text,
+  }
+
+  type Todo = {
+    title: Text,
+    done: Bool,
+  }
+
+  route GET "/todo" -> Response<Result<Todo, ErrorBody>> {
+    return response_ok(status: 200, body: { title: "Buy milk", done: false })
+  }
+
+  route GET "/bad" -> Response<Result<Todo, ErrorBody>> {
+    return response_err(status: 404, code: "not_found", message: "Todo not found.")
+  }
+}
+"""
+    app = parse_source(source, path="good.sl")
+    diagnostics = check_program(app, source_path=Path("good.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_response_ok_record_literal_missing_field() -> None:
+    source = """
+app Bad {
+  type ErrorBody = {
+    code: Text,
+    message: Text,
+  }
+
+  type Todo = {
+    title: Text,
+    done: Bool,
+  }
+
+  route GET "/todo" -> Response<Result<Todo, ErrorBody>> {
+    return response_ok(status: 200, body: { title: "Buy milk" })
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Missing required field `done`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_response_err_non_text_message() -> None:
+    source = """
+app Bad {
+  type ErrorBody = {
+    code: Text,
+    message: Text,
+  }
+
+  type Todo = {
+    title: Text,
+  }
+
+  route GET "/todo" -> Response<Result<Todo, ErrorBody>> {
+    return response_err(status: 404, code: "not_found", message: 404)
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Argument `message` expected `Text`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_response_err_error_body_extra_required_field() -> None:
+    source = """
+app Bad {
+  type ErrorBody = {
+    code: Text,
+    message: Text,
+    detail: Text,
+  }
+
+  type Todo = {
+    title: Text,
+  }
+
+  route GET "/todo" -> Response<Result<Todo, ErrorBody>> {
+    return response_err(status: 404, code: "not_found", message: "Todo not found.")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("extra required fields: detail" in diagnostic.message for diagnostic in diagnostics)
 
 
 def test_checker_accepts_request_header_in_routes() -> None:

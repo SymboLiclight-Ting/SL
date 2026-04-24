@@ -17,6 +17,11 @@ app SmallAdminBackend {
     reason: Text,
   }
 
+  type ErrorBody = {
+    code: Text,
+    message: Text,
+  }
+
   type AdminUser = {
     id: Id<AdminUser>,
     name: Text,
@@ -48,6 +53,10 @@ app SmallAdminBackend {
     admin_token: Text = env("ADMIN_TOKEN", "dev-token"),
     db_path: Text = env("SL_DB", "admin.sqlite"),
     port: Int = env_int("PORT", 8000),
+  }
+
+  fn is_authorized(token: Option<Text>) -> Bool {
+    return token == some(AdminConfig.admin_token)
   }
 
   command create_admin(name: Text, email: Text) -> AdminUser {
@@ -86,16 +95,16 @@ app SmallAdminBackend {
     return "ok"
   }
 
-  route GET "/admins" -> Response<List<AdminUser>> {
-    if request.header("Authorization") == some(AdminConfig.admin_token) {
-      return response(status: 200, body: users.all())
+  route GET "/admins" -> Response<Result<List<AdminUser>, ErrorBody>> {
+    if is_authorized(request.header("Authorization")) {
+      return response_ok(status: 200, body: users.all())
     } else {
-      return response(status: 401, body: [])
+      return response_err(status: 401, code: "unauthorized", message: "Admin token is required.")
     }
   }
 
-  route POST "/admins" body CreateAdmin -> Response<Result<AdminUser, Text>> {
-    if request.header("Authorization") == some(AdminConfig.admin_token) {
+  route POST "/admins" body CreateAdmin -> Response<Result<AdminUser, ErrorBody>> {
+    if is_authorized(request.header("Authorization")) {
       let user = users.insert({
         name: request.body.name,
         email: request.body.email,
@@ -104,14 +113,14 @@ app SmallAdminBackend {
         disabled_reason: none()
       })
       audit_events.insert({ action: "route_create_admin", actor: request.body.name, created_at: now() })
-      return response(status: 201, body: ok(user))
+      return response_ok(status: 201, body: user)
     } else {
-      return response(status: 401, body: err("unauthorized"))
+      return response_err(status: 401, code: "unauthorized", message: "Admin token is required.")
     }
   }
 
-  route PATCH "/admins/disable" body DisableAdmin -> Response<Result<AdminUser, Text>> {
-    if request.header("Authorization") == some(AdminConfig.admin_token) {
+  route PATCH "/admins/disable" body DisableAdmin -> Response<Result<AdminUser, ErrorBody>> {
+    if is_authorized(request.header("Authorization")) {
       let user = users.update(request.body.id, {
         name: request.body.name,
         email: request.body.email,
@@ -120,17 +129,17 @@ app SmallAdminBackend {
         disabled_reason: some(request.body.reason)
       })
       audit_events.insert({ action: "route_disable_admin", actor: request.body.name, created_at: now() })
-      return response(status: 200, body: ok(user))
+      return response_ok(status: 200, body: user)
     } else {
-      return response(status: 401, body: err("unauthorized"))
+      return response_err(status: 401, code: "unauthorized", message: "Admin token is required.")
     }
   }
 
-  route GET "/audit" -> Response<List<AuditEvent>> {
-    if request.header("Authorization") == some(AdminConfig.admin_token) {
-      return response(status: 200, body: audit_events.all())
+  route GET "/audit" -> Response<Result<List<AuditEvent>, ErrorBody>> {
+    if is_authorized(request.header("Authorization")) {
+      return response_ok(status: 200, body: audit_events.all())
     } else {
-      return response(status: 401, body: [])
+      return response_err(status: 401, code: "unauthorized", message: "Admin token is required.")
     }
   }
 
@@ -141,6 +150,13 @@ app SmallAdminBackend {
     assert users.count() == 1
     let disabled = disable_admin(user.id, user.name, user.email, "left team")
     assert disabled.active == false
+    assert users.try_update(999, {
+      name: "Missing",
+      email: "missing@example.com",
+      role: Role.admin,
+      active: false,
+      disabled_reason: some("missing")
+    }) == none()
     assert audit_events.count() == 2
   }
 

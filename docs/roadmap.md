@@ -109,11 +109,19 @@ Deferred to later releases:
 
 ## v0.8 Ecosystem Hardening
 
-- five sample applications,
+Implemented in the current mainline:
+
+- summary schema diff output in `slc doctor --db`,
+- `try_update(id, record) -> Option<T>` for SQLite stores,
+- `response_ok` and `response_err` helpers for `Response<Result<...>>`,
+- Small Admin Backend refactored around explicit auth helper and `ErrorBody`.
+
+Deferred to later releases:
+
 - PyPI release flow,
-- changelog and migration fixtures,
 - documentation site,
-- compatibility test suite across prior examples.
+- compatibility test suite across prior examples,
+- generated migration SQL.
 
 ## v1.0 Stable
 

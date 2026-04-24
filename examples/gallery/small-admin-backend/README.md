@@ -1,6 +1,6 @@
 # Small Admin Backend
 
-This v0.7 gallery example validates SL against a more realistic backend shape.
+This v0.8 gallery example validates SL against a more realistic backend shape.
 
 It covers:
 
@@ -8,9 +8,11 @@ It covers:
 - multiple SQLite stores
 - multiple CLI commands
 - authenticated HTTP routes through `request.header`
+- explicit auth helper extraction
+- unified `ErrorBody` responses through `response_ok` and `response_err`
 - typed request bodies
 - IntentSpec route, command, permission, and acceptance alignment
-- schema drift inspection through `slc doctor --db`
+- schema drift and summary schema diff inspection through `slc doctor --db`
 
 Run:
 

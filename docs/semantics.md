@@ -1,6 +1,6 @@
-# SymbolicLight v0.7 Semantics
+# SymbolicLight v0.8 Semantics
 
-SymbolicLight v0.7 is an application language that compiles to Python.
+SymbolicLight v0.8 is an application language that compiles to Python.
 
 ## Unit Boundary
 
@@ -45,6 +45,7 @@ Supported store methods:
 - `all() -> List<Item>`
 - `get(id) -> Option<Item>`
 - `update(id, record) -> Item`
+- `try_update(id, record) -> Option<Item>`
 - `delete(id) -> Bool`
 - `filter(field: value) -> List<Item>`
 
@@ -52,7 +53,9 @@ Supported store methods:
 
 `get`, `update`, and `delete` require an `Int` or `Id<T>` id argument. `Id<T>` is preferred at command and request-body boundaries because it preserves the target store identity while still compiling to an integer in generated Python.
 
-`update(id, record)` raises a runtime error if no row exists for the id. This keeps the declared return type `T` honest without introducing a breaking `Option<T>` return in v0.7.
+`update(id, record)` raises a runtime error if no row exists for the id. This keeps the declared return type `T` honest without introducing a breaking `Option<T>` return in v0.8.
+
+`try_update(id, record)` has the same validation rules as `update`, but returns `none()` when no row exists for the id.
 
 `filter` requires named arguments and validates field value types.
 
@@ -60,7 +63,7 @@ Supported store methods:
 
 Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.4 does not automatically migrate data.
 
-`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only and returns one of three states: `not initialized`, `up to date`, or `drift detected`. Drift reports include a manual migration suggestion; v0.7 never modifies application data.
+`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only and returns one of three states: `not initialized`, `up to date`, or `drift detected`. Drift reports include summary schema differences and a manual migration suggestion; v0.8 never modifies application data.
 
 ## Request Body Semantics
 
@@ -74,7 +77,7 @@ Routes without a declared body keep the v0.3 compatibility behavior where `reque
 
 Routes may call `request.header(name: Text) -> Option<Text>` to read an HTTP header. The helper is route-only and is checked as an explicit boundary operation. It returns `some(text)` when the header is present and `none()` when absent, represented as `Text` or `None` in generated Python.
 
-v0.7 intentionally does not add auth middleware, cookies, sessions, password handling, or implicit authorization policy. Applications must keep token checks visible in route logic.
+v0.8 intentionally does not add auth middleware, cookies, sessions, password handling, or implicit authorization policy. Applications must keep token checks visible in route logic.
 
 ## Fixture And Golden Test Semantics
 

@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.7 developer preview supports:
+The v0.8 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.

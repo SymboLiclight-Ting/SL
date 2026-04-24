@@ -105,3 +105,12 @@ v0.7 validates SL against a more realistic backend while keeping syntax changes 
 - `slc doctor --db path/to/app.sqlite` is additive and read-only,
 - schema drift inspection reports status but does not migrate data,
 - the Small Admin Backend gallery example is additive.
+
+## v0.8 Notes
+
+v0.8 continues real-app hardening without broad syntax expansion:
+
+- `try_update(id, record) -> Option<T>` is additive and does not change `update(id, record) -> T`,
+- `response_ok` and `response_err` are additive built-ins; `response(...)` behavior is unchanged,
+- `slc doctor --db` adds read-only summary schema diff lines and still never mutates application databases,
+- the Small Admin Backend gallery now demonstrates an explicit auth helper and `ErrorBody` response pattern.

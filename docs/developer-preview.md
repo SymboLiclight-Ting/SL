@@ -1,6 +1,6 @@
 # SL v0.5 Developer Preview
 
-SL v0.7 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
+SL v0.8 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
 
 ## What Is Ready
 

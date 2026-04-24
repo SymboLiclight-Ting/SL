@@ -542,6 +542,94 @@ app MissingUpdate {
     assert "items.update id not found: 999" in completed.stderr
 
 
+def test_generated_try_update_returns_none_for_missing_id(tmp_path: Path) -> None:
+    source = """
+app TryUpdateRuntime {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+
+  test "try update" {
+    let item = items.insert({ title: "first" })
+    let updated = items.try_update(item.id, { title: "second" })
+    assert updated.title == "second"
+    assert items.try_update(999, { title: "ghost" }) == none()
+  }
+}
+"""
+    app = parse_source(source, path="try_update_runtime.sl")
+    diagnostics = check_program(app, source_path=Path("try_update_runtime.sl"))
+    output = tmp_path / "try_update_runtime.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    completed = subprocess.run(
+        [sys.executable, str(output), "test"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "ok - 1 test(s) passed" in completed.stdout
+
+
+def test_generated_response_helpers_return_result_payloads(tmp_path: Path) -> None:
+    source = """
+app ResponseHelpers {
+  type ErrorBody = {
+    code: Text,
+    message: Text,
+  }
+
+  type Item = {
+    title: Text,
+  }
+
+  route GET "/ok" -> Response<Result<Item, ErrorBody>> {
+    return response_ok(status: 201, body: { title: "created" })
+  }
+
+  route GET "/err" -> Response<Result<Item, ErrorBody>> {
+    return response_err(status: 404, code: "not_found", message: "Missing item.")
+  }
+}
+"""
+    app = parse_source(source, path="response_helpers.sl")
+    diagnostics = check_program(app, source_path=Path("response_helpers.sl"))
+    output = tmp_path / "response_helpers.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    port = free_port()
+    proc = subprocess.Popen(
+        [sys.executable, str(output), "serve", "--port", str(port)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        wait_for_server(port)
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/ok", timeout=5) as response:
+            assert response.status == 201
+            assert json.loads(response.read().decode("utf-8")) == {"ok": {"title": "created"}}
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/err", timeout=5)
+            raise AssertionError("expected 404")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404
+            assert json.loads(exc.read().decode("utf-8")) == {
+                "err": {"code": "not_found", "message": "Missing item."}
+            }
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
 def test_generated_schema_drift_does_not_overwrite_existing_hash(tmp_path: Path) -> None:
     source = """
 app DriftRuntime {

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.0
+
+- Added read-only summary schema diff output to `slc doctor --db`.
+- Added `try_update(id, record) -> Option<T>` for stores.
+- Added `response_ok` and `response_err` helpers for `Response<Result<...>>`.
+- Updated Small Admin Backend to use an explicit auth helper and unified `ErrorBody` responses.
+
 ## v0.7.0
 
 - Added the Small Admin Backend gallery example for real-app validation.

@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from symboliclight.ast import App, Unit
+from symboliclight.ast import App, TypeRef, Unit
 from symboliclight.cache import read_check_cache, write_check_cache
 from symboliclight.checker import check_program_result
 from symboliclight.codegen import generate_python, generate_python_artifact, generate_schema_hash
@@ -331,6 +331,7 @@ def schema_drift_lines(app: App, db_path: Path) -> list[str]:
                 return [f"- schema drift: up to date ({db_path})"]
             return [
                 f"- schema drift: drift detected ({db_path})",
+                *schema_diff_lines(app, database),
                 "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
             ]
         finally:
@@ -340,6 +341,83 @@ def schema_drift_lines(app: App, db_path: Path) -> list[str]:
             f"- schema drift: unable to inspect ({db_path})",
             f"- schema drift error: {exc}",
         ]
+
+
+def schema_diff_lines(app: App, database: sqlite3.Connection) -> list[str]:
+    expected_tables = {
+        store.name: expected_columns_for_store(app, store.type_ref)
+        for store in app.stores
+    }
+    actual_tables = actual_schema(database)
+    ignored_tables = {"sl_migrations", "sqlite_sequence"}
+    lines: list[str] = []
+    for table_name in sorted(expected_tables):
+        expected_columns = expected_tables[table_name]
+        actual_columns = actual_tables.get(table_name)
+        if actual_columns is None:
+            lines.append(f"- schema diff: missing table {table_name}")
+            continue
+        for column_name in sorted(expected_columns):
+            expected_type = expected_columns[column_name]
+            actual_type = actual_columns.get(column_name)
+            if actual_type is None:
+                lines.append(f"- schema diff: missing column {table_name}.{column_name}")
+            elif normalize_sqlite_type(actual_type) != normalize_sqlite_type(expected_type):
+                lines.append(
+                    f"- schema diff: type mismatch {table_name}.{column_name} expected {expected_type} found {actual_type}"
+                )
+        for column_name in sorted(set(actual_columns) - set(expected_columns)):
+            lines.append(f"- schema diff: extra column {table_name}.{column_name}")
+    for table_name in sorted(set(actual_tables) - set(expected_tables) - ignored_tables):
+        lines.append(f"- schema diff: extra table {table_name}")
+    if not lines:
+        lines.append("- schema diff: no structural difference detected")
+    return lines
+
+
+def expected_columns_for_store(app: App, type_ref: TypeRef) -> dict[str, str]:
+    type_decl = next((decl for decl in app.types if decl.name == type_ref.name), None)
+    if type_decl is None:
+        return {}
+    columns: dict[str, str] = {}
+    for field in type_decl.fields:
+        columns[field.name] = "INTEGER" if field.name == "id" else sqlite_type_for_doctor(field.type_ref)
+    return columns
+
+
+def actual_schema(database: sqlite3.Connection) -> dict[str, dict[str, str]]:
+    rows = database.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+    schema: dict[str, dict[str, str]] = {}
+    for row in rows:
+        table_name = str(row["name"])
+        pragma_rows = database.execute(f"PRAGMA table_info({sqlite_identifier(table_name)})").fetchall()
+        schema[table_name] = {str(column["name"]): str(column["type"]) for column in pragma_rows}
+    return schema
+
+
+def sqlite_type_for_doctor(type_ref: TypeRef) -> str:
+    if type_ref.name == "Option" and type_ref.args:
+        return sqlite_type_for_doctor(type_ref.args[0])
+    if type_ref.name in {"Bool", "Int", "Id"}:
+        return "INTEGER"
+    if type_ref.name == "Float":
+        return "REAL"
+    return "TEXT"
+
+
+def normalize_sqlite_type(type_name: str) -> str:
+    normalized = type_name.upper().strip()
+    if "INT" in normalized:
+        return "INTEGER"
+    if any(token in normalized for token in ("CHAR", "CLOB", "TEXT")):
+        return "TEXT"
+    if any(token in normalized for token in ("REAL", "FLOA", "DOUB")):
+        return "REAL"
+    return normalized or "TEXT"
+
+
+def sqlite_identifier(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
 
 
 def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:

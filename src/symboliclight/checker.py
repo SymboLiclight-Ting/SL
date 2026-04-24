@@ -36,7 +36,7 @@ from symboliclight.parser import parse_source
 
 PRIMITIVES = {"Bool", "Int", "Float", "Text"}
 GENERIC_ARITY = {"Id": 1, "List": 1, "Option": 1, "Result": 2}
-STORE_METHODS = {"insert", "all", "get", "update", "delete", "filter", "count", "exists", "clear"}
+STORE_METHODS = {"insert", "all", "get", "update", "try_update", "delete", "filter", "count", "exists", "clear"}
 PYTHON_RESERVED_IDENTIFIERS = set(py_keyword.kwlist)
 GENERATED_CLI_COMMANDS = {"serve", "test"}
 
@@ -579,15 +579,20 @@ class Checker:
             return
         if not isinstance(expr, CallExpr):
             return
-        if expected.name == "Response" and expected.args and expr.callee == ["response"]:
-            response_body = self.response_body_expr(expr)
-            if response_body is not None:
-                self.validate_expr_against_target(
-                    response_body,
-                    expected.args[0],
-                    env=env,
-                    allow_missing_id=False,
-                )
+        if expected.name == "Response" and expected.args:
+            if expr.callee == ["response"]:
+                response_body = self.response_body_expr(expr)
+                if response_body is not None:
+                    self.validate_expr_against_target(
+                        response_body,
+                        expected.args[0],
+                        env=env,
+                        allow_missing_id=False,
+                    )
+            elif expr.callee == ["response_ok"]:
+                self.validate_response_ok_target(expr, expected.args[0], env)
+            elif expr.callee == ["response_err"]:
+                self.validate_response_err_target(expr, expected.args[0])
             return
         if expected.name == "Result" and len(expected.args) == 2:
             if expr.callee == ["ok"]:
@@ -636,6 +641,70 @@ class Checker:
         for arg in expr.args:
             if arg.name is None:
                 return arg.expr
+        return None
+
+    def validate_response_ok_target(
+        self,
+        expr: CallExpr,
+        expected_body: TypeRef,
+        env: dict[str, TypeRef],
+    ) -> None:
+        if expected_body.name != "Result" or len(expected_body.args) != 2:
+            return
+        body_arg = self.builtin_arg_expr(expr, "body", positional_index=1)
+        if body_arg is None:
+            return
+        self.validate_expr_against_target(
+            body_arg,
+            expected_body.args[0],
+            env=env,
+            allow_missing_id=False,
+        )
+
+    def validate_response_err_target(self, expr: CallExpr, expected_body: TypeRef) -> None:
+        if expected_body.name != "Result" or len(expected_body.args) != 2:
+            return
+        error_type = expected_body.args[1]
+        record = self.types.get(error_type.name)
+        if record is None:
+            return
+        fields = {field.name: field for field in record.fields}
+        code = fields.get("code")
+        message = fields.get("message")
+        if code is None or message is None:
+            self.error(
+                f"`response_err` requires `{error_type.render()}` to declare `code` and `message` fields.",
+                expr.location,
+                "Use an ErrorBody-style record with `code: Text` and `message: Text`.",
+            )
+            return
+        if code.type_ref.name != "Text" or message.type_ref.name != "Text":
+            self.error(
+                f"`response_err` requires `{error_type.render()}.code` and `.message` to be `Text`.",
+                expr.location,
+                "Use text fields for response error code and message.",
+            )
+        extra_required = [
+            field.name
+            for field in record.fields
+            if field.name not in {"code", "message"} and not self.is_optional(field.type_ref)
+        ]
+        if extra_required:
+            self.error(
+                f"`response_err` cannot construct `{error_type.render()}` because it has extra required fields: {', '.join(extra_required)}.",
+                expr.location,
+                "Use only `code` and `message` as required error fields, or call `response(status, body: err(...))` directly.",
+            )
+
+    def builtin_arg_expr(self, expr: CallExpr, name: str, *, positional_index: int) -> Expr | None:
+        current_positional = 0
+        for arg in expr.args:
+            if arg.name == name:
+                return arg.expr
+            if arg.name is None:
+                if current_positional == positional_index:
+                    return arg.expr
+                current_positional += 1
         return None
 
     def infer_expr(self, expr: Expr, env: dict[str, TypeRef], *, context_kind: str | None = None) -> TypeRef:
@@ -758,6 +827,8 @@ class Checker:
             return self.infer_wrapper_constructor(expr, env)
         if len(expr.callee) == 1 and expr.callee[0] in {
             "response",
+            "response_ok",
+            "response_err",
             "env",
             "env_int",
             "uuid",
@@ -898,7 +969,7 @@ class Checker:
             self.error(
                 f"Unknown store method `{'.'.join(expr.callee)}`.",
                 expr.location,
-                "Use insert, all, get, update, delete, filter, count, exists, or clear.",
+                "Use insert, all, get, update, try_update, delete, filter, count, exists, or clear.",
             )
             return TypeRef("Unknown")
         if method != "filter":
@@ -949,6 +1020,19 @@ class Checker:
                         "Use `items.update(id, { field: value })`.",
                     )
             return item_type
+        if method == "try_update":
+            self.expect_arg_count(expr, 2)
+            self.check_store_id_arg(expr, env, item_type)
+            if len(expr.args) >= 2:
+                if isinstance(expr.args[1].expr, RecordExpr):
+                    self.validate_record_expr(expr.args[1].expr, item_type, allow_missing_id=True, env=env)
+                else:
+                    self.error(
+                        "Store try_update requires a record literal in v0.8.",
+                        expr.args[1].location,
+                        "Use `items.try_update(id, { field: value })`.",
+                    )
+            return TypeRef("Option", [item_type])
         if method == "delete":
             self.expect_arg_count(expr, 1)
             self.check_store_id_arg(expr, env, item_type)
@@ -1023,6 +1107,34 @@ class Checker:
                                 "Use text values for response headers.",
                             )
             return TypeRef("Response", [body_type])
+        if name == "response_ok":
+            args = self.bind_builtin_args(expr, ["status", "body", "headers"], required=["status", "body"])
+            status_arg = args.get("status")
+            body_arg = args.get("body")
+            if status_arg is None or body_arg is None:
+                return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("ErrorBody")])])
+            status_type = self.infer_expr(status_arg.expr, env, context_kind=context_kind)
+            if status_type.name != "Int":
+                self.error("response_ok status requires Int.", status_arg.location, "Pass an integer HTTP status.")
+            body_type = self.infer_expr(body_arg.expr, env, context_kind=context_kind)
+            self.check_response_headers(args, env, context_kind)
+            return TypeRef("Response", [TypeRef("Result", [body_type, TypeRef("ErrorBody")])])
+        if name == "response_err":
+            args = self.bind_builtin_args(
+                expr,
+                ["status", "code", "message", "headers"],
+                required=["status", "code", "message"],
+            )
+            status_arg = args.get("status")
+            if status_arg is None:
+                return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("ErrorBody")])])
+            status_type = self.infer_expr(status_arg.expr, env, context_kind=context_kind)
+            if status_type.name != "Int":
+                self.error("response_err status requires Int.", status_arg.location, "Pass an integer HTTP status.")
+            self.check_bound_arg_type(args, env, "code", TypeRef("Text"), context_kind)
+            self.check_bound_arg_type(args, env, "message", TypeRef("Text"), context_kind)
+            self.check_response_headers(args, env, context_kind)
+            return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("ErrorBody")])])
         if name == "env":
             args = self.bind_builtin_args(expr, ["name", "default"], required=["name", "default"])
             self.check_bound_arg_type(args, env, "name", TypeRef("Text"), context_kind)
@@ -1050,6 +1162,27 @@ class Checker:
             self.check_bound_arg_type(args, env, "content", TypeRef("Text"), context_kind)
             return TypeRef("Bool")
         return TypeRef("Unknown")
+
+    def check_response_headers(
+        self,
+        args: dict[str, Arg],
+        env: dict[str, TypeRef],
+        context_kind: str,
+    ) -> None:
+        headers_arg = args.get("headers")
+        if headers_arg is None:
+            return
+        if not isinstance(headers_arg.expr, RecordExpr):
+            self.error("response headers require a record literal.", headers_arg.location, "Use `{ name: value }` headers.")
+            return
+        for field in headers_arg.expr.fields:
+            header_type = self.infer_expr(field.expr, env, context_kind=context_kind)
+            if header_type.name != "Text":
+                self.error(
+                    f"response header `{field.name}` expected `Text`, found `{header_type.render()}`.",
+                    field.location,
+                    "Use text values for response headers.",
+                )
 
     def bind_builtin_args(self, expr: CallExpr, allowed: list[str], *, required: list[str]) -> dict[str, Arg]:
         builtin_name = ".".join(expr.callee)

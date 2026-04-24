@@ -325,6 +325,49 @@ app DriftDemo {
     assert "schema drift suggestion:" in doctor
 
 
+def test_cli_doctor_reports_schema_diff_from_db(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    source.write_text(
+        """
+app DriftDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+    done: Bool,
+  }
+
+  store items: Item
+}
+""",
+        encoding="utf-8",
+    )
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute("INSERT INTO sl_migrations (version, schema_hash) VALUES (1, 'old')")
+        database.execute("CREATE TABLE items (id TEXT, title TEXT, extra TEXT)")
+        database.execute("CREATE TABLE extra_table (id INTEGER)")
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["doctor", str(source), "--db", str(db_path)]) == 0
+    doctor = capsys.readouterr().out
+
+    assert "schema diff: missing column items.done" in doctor
+    assert "schema diff: extra column items.extra" in doctor
+    assert "schema diff: type mismatch items.id expected INTEGER found TEXT" in doctor
+    assert "schema diff: extra table extra_table" in doctor
+
+    database = sqlite3.connect(db_path)
+    try:
+        stored = database.execute("SELECT schema_hash FROM sl_migrations WHERE version = 1").fetchone()[0]
+    finally:
+        database.close()
+    assert stored == "old"
+
+
 def test_cli_doctor_reports_uninitialized_schema_db(tmp_path: Path, capsys) -> None:
     source = tmp_path / "app.sl"
     db_path = tmp_path / "missing.sqlite"
