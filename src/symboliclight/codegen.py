@@ -168,9 +168,10 @@ class PythonGenerator:
         lines.extend([
             "    database.execute('CREATE TABLE IF NOT EXISTS sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)')",
             "    row = database.execute('SELECT schema_hash FROM sl_migrations WHERE version = ?', [SL_SCHEMA_VERSION]).fetchone()",
-            "    if row and row['schema_hash'] != SL_SCHEMA_HASH:",
-            "        print('warning: SymbolicLight schema drift detected; automatic migrations are not implemented in v0.4', file=sys.stderr)",
-            "    database.execute('INSERT OR REPLACE INTO sl_migrations (version, schema_hash) VALUES (?, ?)', [SL_SCHEMA_VERSION, SL_SCHEMA_HASH])",
+            "    if row is None:",
+            "        database.execute('INSERT INTO sl_migrations (version, schema_hash) VALUES (?, ?)', [SL_SCHEMA_VERSION, SL_SCHEMA_HASH])",
+            "    elif row['schema_hash'] != SL_SCHEMA_HASH:",
+            "        print('warning: SymbolicLight schema drift detected; automatic migrations are not implemented in v0.7', file=sys.stderr)",
         ])
         if not self.app.stores:
             lines.extend(["    database.commit()", "    return"])

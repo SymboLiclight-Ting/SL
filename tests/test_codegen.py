@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import os
 import py_compile
+import sqlite3
 import socket
 import subprocess
 import sys
@@ -9,7 +10,7 @@ import time
 import urllib.error
 import urllib.request
 
-from symboliclight.codegen import generate_python, generate_python_artifact
+from symboliclight.codegen import generate_python, generate_python_artifact, generate_schema_hash
 from symboliclight.checker import check_program
 from symboliclight.parser import parse_source
 
@@ -473,6 +474,55 @@ app SqlKeywords {
     )
 
     assert "ok - 1 test(s) passed" in completed.stdout
+
+
+def test_generated_schema_drift_does_not_overwrite_existing_hash(tmp_path: Path) -> None:
+    source = """
+app DriftRuntime {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+
+  command count() -> Int {
+    return items.count()
+  }
+}
+"""
+    app_path = tmp_path / "drift_runtime.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    output = tmp_path / "drift_runtime.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+    db_path = tmp_path / "drift.sqlite"
+    old_hash = "old-schema-hash"
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute("INSERT INTO sl_migrations (version, schema_hash) VALUES (1, ?)", [old_hash])
+        database.commit()
+    finally:
+        database.close()
+
+    completed = subprocess.run(
+        [sys.executable, str(output), "count"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SL_DB": str(db_path)},
+    )
+
+    database = sqlite3.connect(db_path)
+    try:
+        stored = database.execute("SELECT schema_hash FROM sl_migrations WHERE version = 1").fetchone()[0]
+    finally:
+        database.close()
+
+    assert "schema drift detected" in completed.stderr
+    assert stored == old_hash
+    assert stored != generate_schema_hash(app)
 
 
 def free_port() -> int:

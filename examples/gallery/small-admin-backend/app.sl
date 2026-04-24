@@ -94,7 +94,7 @@ app SmallAdminBackend {
     }
   }
 
-  route POST "/admins" body CreateAdmin -> Response<AdminUser> {
+  route POST "/admins" body CreateAdmin -> Response<Result<AdminUser, Text>> {
     if request.header("Authorization") == some(AdminConfig.admin_token) {
       let user = users.insert({
         name: request.body.name,
@@ -104,19 +104,13 @@ app SmallAdminBackend {
         disabled_reason: none()
       })
       audit_events.insert({ action: "route_create_admin", actor: request.body.name, created_at: now() })
-      return response(status: 201, body: user)
+      return response(status: 201, body: ok(user))
     } else {
-      return response(status: 401, body: {
-        name: "unauthorized",
-        email: "unauthorized",
-        role: Role.auditor,
-        active: false,
-        disabled_reason: some("unauthorized")
-      })
+      return response(status: 401, body: err("unauthorized"))
     }
   }
 
-  route PATCH "/admins/disable" body DisableAdmin -> Response<AdminUser> {
+  route PATCH "/admins/disable" body DisableAdmin -> Response<Result<AdminUser, Text>> {
     if request.header("Authorization") == some(AdminConfig.admin_token) {
       let user = users.update(request.body.id, {
         name: request.body.name,
@@ -126,15 +120,9 @@ app SmallAdminBackend {
         disabled_reason: some(request.body.reason)
       })
       audit_events.insert({ action: "route_disable_admin", actor: request.body.name, created_at: now() })
-      return response(status: 200, body: user)
+      return response(status: 200, body: ok(user))
     } else {
-      return response(status: 401, body: {
-        name: "unauthorized",
-        email: "unauthorized",
-        role: Role.auditor,
-        active: false,
-        disabled_reason: some("unauthorized")
-      })
+      return response(status: 401, body: err("unauthorized"))
     }
   }
 
