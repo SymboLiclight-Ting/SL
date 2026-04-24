@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from symboliclight.ast import (
     App,
     AssertStmt,
@@ -141,7 +143,7 @@ class Formatter:
             if expr.value is False:
                 return "false"
             if isinstance(expr.value, str):
-                return repr(expr.value).replace("'", '"')
+                return json.dumps(expr.value, ensure_ascii=False)
             return str(expr.value)
         if isinstance(expr, PathExpr):
             return ".".join(expr.parts)

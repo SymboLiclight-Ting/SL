@@ -391,6 +391,21 @@ app Commented {
     assert source.read_text(encoding="utf-8") == original
 
 
+def test_cli_fmt_preserves_escaped_strings(tmp_path: Path) -> None:
+    source = tmp_path / "escaped.sl"
+    source.write_text(
+        'app Escaped { test "strings" { assert "a\\"b" == "a\\"b" assert "line\\nbreak" == "line\\nbreak" } }',
+        encoding="utf-8",
+    )
+
+    assert main(["fmt", str(source)]) == 0
+    formatted = source.read_text(encoding="utf-8")
+
+    assert '\\"' in formatted
+    assert "\\n" in formatted
+    assert main(["check", str(source), "--no-cache"]) == 0
+
+
 def test_cli_check_json_outputs_machine_readable_diagnostics(tmp_path: Path, capsys) -> None:
     source = tmp_path / "bad.sl"
     source.write_text(

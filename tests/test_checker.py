@@ -542,3 +542,21 @@ app Bad {
 
     assert any("Command `test` conflicts with a generated CLI command" in diagnostic.message for diagnostic in diagnostics)
     assert any("Command `serve` conflicts with a generated CLI command" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_duplicate_routes() -> None:
+    source = """
+app Bad {
+  route GET "/items" -> Text {
+    return "one"
+  }
+
+  route GET "/items" -> Text {
+    return "two"
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Duplicate route `GET /items`" in diagnostic.message for diagnostic in diagnostics)

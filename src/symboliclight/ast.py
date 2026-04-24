@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import re
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -102,8 +104,11 @@ class RouteDecl:
 
     @property
     def function_name(self) -> str:
-        safe = self.path.strip("/").replace("/", "_").replace("-", "_") or "root"
-        return f"route_{self.method.lower()}_{safe}"
+        safe = re.sub(r"[^0-9A-Za-z_]+", "_", self.path.strip("/")).strip("_").lower() or "root"
+        if safe[0].isdigit():
+            safe = f"path_{safe}"
+        digest = hashlib.sha1(f"{self.method} {self.path}".encode("utf-8")).hexdigest()[:8]
+        return f"route_{self.method.lower()}_{safe}_{digest}"
 
 
 @dataclass(slots=True)

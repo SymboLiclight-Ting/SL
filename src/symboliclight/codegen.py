@@ -173,10 +173,10 @@ class PythonGenerator:
             columns = []
             for field in type_decl.fields:
                 if field.name == "id":
-                    columns.append("id INTEGER PRIMARY KEY AUTOINCREMENT")
+                    columns.append(f"{self.sqlite_identifier(field.name)} INTEGER PRIMARY KEY AUTOINCREMENT")
                 else:
-                    columns.append(f"{field.name} {self.sqlite_type(field.type_ref)}")
-            sql = f"CREATE TABLE IF NOT EXISTS {store.name} ({', '.join(columns)})"
+                    columns.append(f"{self.sqlite_identifier(field.name)} {self.sqlite_type(field.type_ref)}")
+            sql = f"CREATE TABLE IF NOT EXISTS {self.sqlite_identifier(store.name)} ({', '.join(columns)})"
             lines.append(f"    database.execute({sql!r})")
         lines.extend(["    database.commit()", ""])
         for store in self.app.stores:
@@ -195,9 +195,16 @@ class PythonGenerator:
 
     def emit_store_helpers(self, store_name: str, type_decl: TypeDecl) -> list[str]:
         data_fields = [field for field in type_decl.fields if field.name != "id"]
-        columns = ", ".join(field.name for field in data_fields)
+        table = self.sqlite_identifier(store_name)
+        id_column = self.sqlite_identifier("id")
+        columns = ", ".join(self.sqlite_identifier(field.name) for field in data_fields)
         placeholders = ", ".join("?" for _ in data_fields)
         values = ", ".join(f"item.get({field.name!r})" for field in data_fields)
+        updates = ", ".join(f"{self.sqlite_identifier(field.name)} = ?" for field in data_fields)
+        filter_columns = {
+            field.name: self.sqlite_identifier(field.name)
+            for field in type_decl.fields
+        }
         lines = [
             f"def {store_name}_normalize(item):",
             "    item = dict(item)",
@@ -215,50 +222,51 @@ class PythonGenerator:
         )
         lines.extend([
             f"def {store_name}_insert(item):",
-            f"    cursor = conn().execute('INSERT INTO {store_name} ({columns}) VALUES ({placeholders})', [{values}])",
+            f"    cursor = conn().execute('INSERT INTO {table} ({columns}) VALUES ({placeholders})', [{values}])",
             "    conn().commit()",
             f"    return {store_name}_get(cursor.lastrowid)",
             "",
             f"def {store_name}_all():",
-            f"    rows = conn().execute('SELECT * FROM {store_name} ORDER BY id').fetchall()",
+            f"    rows = conn().execute('SELECT * FROM {table} ORDER BY {id_column}').fetchall()",
             f"    return [{store_name}_normalize(dict(row)) for row in rows]",
             "",
             f"def {store_name}_get(item_id):",
-            f"    row = conn().execute('SELECT * FROM {store_name} WHERE id = ?', [item_id]).fetchone()",
+            f"    row = conn().execute('SELECT * FROM {table} WHERE {id_column} = ?', [item_id]).fetchone()",
             f"    return {store_name}_normalize(dict(row)) if row else None",
             "",
             f"def {store_name}_update(item_id, item):",
             "    item = dict(item)",
-            f"    conn().execute('UPDATE {store_name} SET {', '.join(field.name + ' = ?' for field in data_fields)} WHERE id = ?', [{values}, item_id])",
+            f"    conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = ?', [{values}, item_id])",
             "    conn().commit()",
             f"    return {store_name}_get(item_id)",
             "",
             f"def {store_name}_delete(item_id):",
-            f"    cursor = conn().execute('DELETE FROM {store_name} WHERE id = ?', [item_id])",
+            f"    cursor = conn().execute('DELETE FROM {table} WHERE {id_column} = ?', [item_id])",
             "    conn().commit()",
             "    return cursor.rowcount > 0",
             "",
             f"def {store_name}_filter(**criteria):",
             f"    allowed = {sorted(field.name for field in type_decl.fields)!r}",
+            f"    columns = {filter_columns!r}",
             "    for key in criteria:",
             "        if key not in allowed:",
             "            raise ValueError(f'unknown filter field: {key}')",
             "    if not criteria:",
             f"        return {store_name}_all()",
-            "    where = ' AND '.join(f'{key} = ?' for key in criteria)",
-            f"    rows = conn().execute('SELECT * FROM {store_name} WHERE ' + where + ' ORDER BY id', list(criteria.values())).fetchall()",
+            "    where = ' AND '.join(f'{columns[key]} = ?' for key in criteria)",
+            f"    rows = conn().execute('SELECT * FROM {table} WHERE ' + where + ' ORDER BY {id_column}', list(criteria.values())).fetchall()",
             f"    return [{store_name}_normalize(dict(row)) for row in rows]",
             "",
             f"def {store_name}_count():",
-            f"    row = conn().execute('SELECT COUNT(*) AS count FROM {store_name}').fetchone()",
+            f"    row = conn().execute('SELECT COUNT(*) AS count FROM {table}').fetchone()",
             "    return int(row['count'])",
             "",
             f"def {store_name}_exists(item_id):",
-            f"    row = conn().execute('SELECT 1 FROM {store_name} WHERE id = ?', [item_id]).fetchone()",
+            f"    row = conn().execute('SELECT 1 FROM {table} WHERE {id_column} = ?', [item_id]).fetchone()",
             "    return row is not None",
             "",
             f"def {store_name}_clear():",
-            f"    cursor = conn().execute('DELETE FROM {store_name}')",
+            f"    cursor = conn().execute('DELETE FROM {table}')",
             "    conn().commit()",
             "    return cursor.rowcount",
             "",
@@ -581,6 +589,9 @@ class PythonGenerator:
         if type_ref.name == "Float":
             return "REAL"
         return "TEXT"
+
+    def sqlite_identifier(self, name: str) -> str:
+        return '"' + name.replace('"', '""') + '"'
 
     def required_body_fields(self, route: RouteDecl) -> list[str]:
         if route.body_type is None:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from symboliclight.diagnostics import Diagnostic
 
-CACHE_VERSION = "check-v3"
+CACHE_VERSION = "check-v4"
 
 
 @dataclass(slots=True)

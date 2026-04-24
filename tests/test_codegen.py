@@ -349,6 +349,78 @@ app Fixtures {
     assert not (golden_dir / "todos.json.actual").exists()
 
 
+def test_codegen_sanitizes_route_handler_names(tmp_path: Path) -> None:
+    source = """
+app Routes {
+  route GET "/items/{id}" -> Text {
+    return "item"
+  }
+
+  route GET "/a-b" -> Text {
+    return "dash"
+  }
+
+  route GET "/a_b" -> Text {
+    return "underscore"
+  }
+}
+"""
+    app_path = tmp_path / "routes.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    diagnostics = check_program(app, source_path=app_path)
+    output = tmp_path / "routes.py"
+    generated = generate_python(app)
+    output.write_text(generated, encoding="utf-8")
+
+    handler_lines = [line for line in generated.splitlines() if line.startswith("def route_get_a_b_")]
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    assert "def route_get_items_id_" in generated
+    assert len(handler_lines) == 2
+    assert len(set(handler_lines)) == 2
+    py_compile.compile(str(output), doraise=True)
+
+
+def test_generated_store_quotes_sqlite_identifiers(tmp_path: Path) -> None:
+    source = """
+app SqlKeywords {
+  type Item = {
+    id: Id<Item>,
+    order: Text,
+  }
+
+  store select: Item
+
+  test "sqlite keywords" {
+    let item = select.insert({ order: "first" })
+    select.filter(order: "first")
+    let updated = select.update(item.id, { order: "second" })
+    assert updated.order == "second"
+    assert select.exists(item.id) == true
+    assert select.delete(item.id) == true
+  }
+}
+"""
+    app_path = tmp_path / "sql_keywords.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    diagnostics = check_program(app, source_path=app_path)
+    output = tmp_path / "sql_keywords.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    completed = subprocess.run(
+        [sys.executable, str(output), "test"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "ok - 1 test(s) passed" in completed.stdout
+
+
 def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))

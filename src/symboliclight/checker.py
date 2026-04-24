@@ -90,6 +90,8 @@ class Checker:
         self.check_duplicate_names()
         self.check_codegen_reserved_identifiers()
         if isinstance(self.unit, App):
+            self.check_duplicate_routes()
+        if isinstance(self.unit, App):
             self.check_intents()
             self.check_permissions()
         for enum_decl in self.unit.enums:
@@ -328,6 +330,22 @@ class Checker:
             "Choose a different identifier so generated Python remains valid.",
             code="SLC091",
         )
+
+    def check_duplicate_routes(self) -> None:
+        assert isinstance(self.unit, App)
+        seen: dict[tuple[str, str], RouteDecl] = {}
+        for route in self.unit.routes:
+            key = (route.method, route.path)
+            previous = seen.get(key)
+            if previous is not None:
+                self.error(
+                    f"Duplicate route `{route.method} {route.path}`.",
+                    route.location,
+                    "Use one handler for each method and path pair.",
+                    code="SLC092",
+                )
+                continue
+            seen[key] = route
 
     def check_intents(self) -> None:
         assert isinstance(self.unit, App)
