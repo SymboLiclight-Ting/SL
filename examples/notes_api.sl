@@ -1,6 +1,8 @@
 app NotesApi {
   intent "./notes.intent.yaml"
 
+  permissions from intent.permissions
+
   type CreateNote = {
     title: Text,
     body: Text,
@@ -42,6 +44,8 @@ app NotesApi {
     let note = notes.insert({ title: request.body.title, body: request.body.body })
     return response(status: 201, body: note)
   }
+
+  test from intent.acceptance
 
   test "fixture count" {
     assert notes.count() == 1

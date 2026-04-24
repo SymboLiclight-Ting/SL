@@ -1,6 +1,12 @@
 version: "0.1"
 kind: "IntentSpec"
 
+# sl: route GET /notes
+# sl: route POST /notes
+# sl: command add
+# sl: command list
+# sl: command count
+
 metadata:
   name: "notes-api"
   title: "Notes API"

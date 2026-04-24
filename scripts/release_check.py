@@ -33,9 +33,14 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
         [python, "-m", "pytest", "-q"],
         [python, "-m", "compileall", "-q", "src", "playground", "scripts"],
         [python, "-m", "symboliclight.cli", "check", "--json", "examples/todo_app.sl"],
+        [python, "-m", "symboliclight.cli", "test", "examples/todo_app.sl"],
+        [python, "-m", "symboliclight.cli", "doctor", "examples/todo_app.sl"],
+        [python, "-m", "symboliclight.cli", "test", "examples/issue_tracker.sl"],
+        [python, "-m", "symboliclight.cli", "doctor", "examples/issue_tracker.sl"],
         [python, "-m", "symboliclight.cli", "build", "examples/notes_api.sl", "--out", "build/notes_api.py"],
         [python, "-m", "py_compile", "build/notes_api.py"],
         [python, "build/notes_api.py", "test"],
+        [python, "-m", "symboliclight.cli", "doctor", "examples/notes_api.sl"],
     ]
     for source in [
         "examples/gallery/todo-api-cli/app.sl",

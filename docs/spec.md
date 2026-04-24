@@ -45,6 +45,8 @@ test from intent.acceptance
 
 `slc check` validates the referenced intent file when the IntentSpec package is installed. Missing IntentSpec support is a warning unless `--strict-intent` is used.
 
+When an app declares `test from intent.acceptance`, `slc test` runs a v0.6 offline acceptance bridge after generated app tests pass. The bridge reads the referenced IntentSpec file, checks SL route and command hints, checks permission mismatches, and supports the `required_sections` assertion against `output.sections`. Unsupported IntentSpec assertions fail with an explicit diagnostic.
+
 ## Types
 
 Built-in scalar types:
@@ -209,6 +211,8 @@ External IntentSpec tests are declared with:
 test from intent.acceptance
 ```
 
+Generated Python prints external tests as skipped. The `slc test` command owns IntentSpec acceptance execution because it has access to both the source app and the IntentSpec contract.
+
 ## Statements
 
 ```text
@@ -274,6 +278,8 @@ slc add route GET /items <path>
 ```
 
 These hints avoid adding nonstandard top-level fields to IntentSpec while still allowing doctor to compare declared routes and commands against the SL implementation.
+
+The same hints are used by `slc test` when `test from intent.acceptance` is declared. Missing hinted routes or commands fail offline acceptance. Extra routes or commands are reported as warnings.
 
 ## Generated Python Contract
 

@@ -4,6 +4,8 @@
 - Run `python -m compileall -q src playground`.
 - Run `slc check examples/todo_app.sl`.
 - Run `slc check --json examples/todo_app.sl`.
+- Run `slc test examples/issue_tracker.sl` to exercise IntentSpec acceptance.
+- Run `slc doctor examples/issue_tracker.sl` and confirm route, command, permission, and acceptance lines are present.
 - Run `slc build examples/todo_app.sl --out build/todo_app.py`.
 - Run `python -m py_compile build/todo_app.py`.
 - Run `python build/todo_app.py test`.

@@ -1,6 +1,12 @@
 app TodoApp {
   intent "./todo.intent.yaml"
 
+  permissions from intent.permissions
+
+  type CreateTodo = {
+    title: Text,
+  }
+
   type Todo = {
     id: Id<Todo>,
     title: Text,
@@ -21,10 +27,12 @@ app TodoApp {
     return todos.all()
   }
 
-  route POST "/todos" -> Todo {
+  route POST "/todos" body CreateTodo -> Todo {
     let title = request.body.title
     return todos.insert({ title: title, done: false })
   }
+
+  test from intent.acceptance
 
   test "add creates todo" {
     let item = add("Buy milk")

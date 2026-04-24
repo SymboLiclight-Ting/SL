@@ -3,6 +3,7 @@
 ## v0.6.0
 
 - Added IntentSpec-aware `slc doctor` diffing for SL route and command hints.
+- Added offline IntentSpec acceptance checks through `slc test` for `test from intent.acceptance`.
 - Added permission mismatch reporting for routes, local state writes, and file reads/writes.
 - Added `scripts/release_check.py` for repeatable release smoke checks.
 - Added the Customer Brief Generator gallery example.

@@ -45,6 +45,7 @@ The v0.6 developer preview supports:
 - local VS Code syntax, snippets, and language-server wiring under `editors/vscode`.
 - local playground under `playground/`.
 - IntentSpec-aware `slc doctor` route, command, and permission alignment hints.
+- IntentSpec acceptance checks through `slc test` for apps that declare `test from intent.acceptance`.
 - repeatable release smoke checks through `scripts/release_check.py`.
 
 ## Quick Start
@@ -148,6 +149,8 @@ SymbolicLight = the application implementation
 ```
 
 IntentSpec validation is optional in normal `slc check` runs. If the `intentspec` package is installed, SL validates referenced intent files. Missing IntentSpec support is reported as a warning unless `--strict-intent` is used.
+
+When an app declares `test from intent.acceptance`, `slc test` runs a v0.6 offline acceptance bridge after generated app tests pass. It checks SL route and command hints, permission mismatches, and `required_sections` assertions from the IntentSpec output contract.
 
 ## Commands
 

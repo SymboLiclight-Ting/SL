@@ -1,6 +1,11 @@
 version: "0.1"
 kind: "IntentSpec"
 
+# sl: route GET /todos
+# sl: route POST /todos
+# sl: command add
+# sl: command list
+
 metadata:
   name: "todo_app"
   title: "Todo API and CLI"
@@ -13,7 +18,7 @@ task:
   priority: "high"
 
 permissions:
-  web: false
+  web: true
   filesystem:
     read: true
     write: true

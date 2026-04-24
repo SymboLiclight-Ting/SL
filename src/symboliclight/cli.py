@@ -134,7 +134,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return completed.returncode
         if args.command == "test":
-            app, diagnostics, _ = load_checked_app(Path(args.source), strict_intent=False, use_cache=False)
+            source_path = Path(args.source)
+            app, diagnostics, _ = load_checked_app(source_path, strict_intent=False, use_cache=False)
             print_diagnostics(diagnostics)
             raise_if_errors(diagnostics)
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -144,7 +145,9 @@ def main(argv: list[str] | None = None) -> int:
                     [sys.executable, str(output), "test"],
                     check=False,
                 )
-                return completed.returncode
+                if completed.returncode != 0:
+                    return completed.returncode
+            return run_intent_acceptance(app, source_path)
         if args.command == "fmt":
             return format_file(Path(args.source), check_only=args.check)
         if args.command == "doctor":
@@ -294,11 +297,8 @@ def doctor_report(unit: Unit, diagnostics: list[Diagnostic], source_path: Path, 
 
 def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:
     lines = [f"- intent contract: {contract.path.name}"]
-    app_routes = {(route.method, route.path) for route in app.routes}
-    intent_routes = {(route.method, route.path) for route in contract.routes}
+    app_routes, intent_routes, missing, extra = route_alignment(app, contract)
     if contract.routes:
-        missing = sorted(intent_routes - app_routes)
-        extra = sorted(app_routes - intent_routes)
         lines.append(f"- intent routes: {len(app_routes & intent_routes)}/{len(intent_routes)} matched")
         if missing:
             lines.append("- intent missing routes: " + ", ".join(f"{method} {path}" for method, path in missing))
@@ -306,11 +306,8 @@ def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:
             lines.append("- intent extra routes: " + ", ".join(f"{method} {path}" for method, path in extra))
     elif app.routes:
         lines.append("- intent routes: not declared")
-    app_commands = {function.name for function in app.functions if function.kind == "command"}
-    intent_commands = set(contract.commands)
+    app_commands, intent_commands, missing_commands, extra_commands = command_alignment(app, contract)
     if contract.commands:
-        missing_commands = sorted(intent_commands - app_commands)
-        extra_commands = sorted(app_commands - intent_commands)
         lines.append(f"- intent commands: {len(app_commands & intent_commands)}/{len(intent_commands)} matched")
         if missing_commands:
             lines.append("- intent missing commands: " + ", ".join(missing_commands))
@@ -319,25 +316,95 @@ def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:
     elif app_commands:
         lines.append("- intent commands: not declared")
     lines.extend(permission_doctor_lines(app, contract))
+    if contract.acceptance_tests:
+        lines.append(f"- intent acceptance tests: {len(contract.acceptance_tests)} declared")
+    else:
+        lines.append("- intent acceptance tests: not declared")
     if app.intents and not any(test.external_ref == "intent.acceptance" for test in app.tests):
         lines.append("- intent acceptance gap: `test from intent.acceptance` not declared")
+    elif app.intents and not contract.acceptance_tests:
+        lines.append("- intent acceptance gap: contract has no tests")
     return lines
 
 
+def route_alignment(app: App, contract: IntentContract) -> tuple[set[tuple[str, str]], set[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
+    app_routes = {(route.method, route.path) for route in app.routes}
+    intent_routes = {(route.method, route.path) for route in contract.routes}
+    return app_routes, intent_routes, sorted(intent_routes - app_routes), sorted(app_routes - intent_routes)
+
+
+def command_alignment(app: App, contract: IntentContract) -> tuple[set[str], set[str], list[str], list[str]]:
+    app_commands = {function.name for function in app.functions if function.kind == "command"}
+    intent_commands = set(contract.commands)
+    return app_commands, intent_commands, sorted(intent_commands - app_commands), sorted(app_commands - intent_commands)
+
+
 def permission_doctor_lines(app: App, contract: IntentContract) -> list[str]:
+    lines: list[str] = []
+    lines.extend(f"- {line}" for line in permission_mismatch_lines(app, contract))
+    if contract.permissions.network is False:
+        lines.append("- permission network: ok")
+    return lines
+
+
+def permission_mismatch_lines(app: App, contract: IntentContract) -> list[str]:
     lines: list[str] = []
     uses_web = bool(app.routes)
     uses_filesystem_read = app_uses_call(app, "read_text")
     uses_filesystem_write = bool(app.stores) or app_uses_call(app, "write_text")
     if contract.permissions.web is False and uses_web:
-        lines.append("- permission mismatch: IntentSpec permissions.web is false but app declares routes")
+        lines.append("permission mismatch: IntentSpec permissions.web is false but app declares routes")
     if contract.permissions.filesystem_read is False and uses_filesystem_read:
-        lines.append("- permission mismatch: IntentSpec filesystem.read is false but app reads files")
+        lines.append("permission mismatch: IntentSpec filesystem.read is false but app reads files")
     if contract.permissions.filesystem_write is False and uses_filesystem_write:
-        lines.append("- permission mismatch: IntentSpec filesystem.write is false but app writes local state")
-    if contract.permissions.network is False:
-        lines.append("- permission network: ok")
+        lines.append("permission mismatch: IntentSpec filesystem.write is false but app writes local state")
     return lines
+
+
+def run_intent_acceptance(app: App, source_path: Path) -> int:
+    if not any(test.external_ref == "intent.acceptance" for test in app.tests):
+        return 0
+    failures: list[str] = []
+    warnings: list[str] = []
+    checked = 0
+    for intent_path in app.intents:
+        contract_path = (source_path.parent / intent_path).resolve()
+        if not contract_path.exists():
+            failures.append(f"intent acceptance failed: missing contract {intent_path}")
+            continue
+        contract = load_intent_contract(contract_path)
+        _, _, missing_routes, extra_routes = route_alignment(app, contract)
+        _, _, missing_commands, extra_commands = command_alignment(app, contract)
+        failures.extend(f"intent acceptance failed: missing route {method} {path}" for method, path in missing_routes)
+        failures.extend(f"intent acceptance failed: missing command {name}" for name in missing_commands)
+        warnings.extend(f"intent acceptance warning: extra route {method} {path}" for method, path in extra_routes)
+        warnings.extend(f"intent acceptance warning: extra command {name}" for name in extra_commands)
+        failures.extend(f"intent acceptance failed: {line}" for line in permission_mismatch_lines(app, contract))
+        if not contract.acceptance_tests:
+            failures.append(f"intent acceptance failed: {contract.path.name} declares no acceptance tests")
+            continue
+        for test in contract.acceptance_tests:
+            if not test.assert_types:
+                warnings.append(f"intent acceptance warning: `{test.name}` has no assertions")
+            for assert_type in test.assert_types:
+                checked += 1
+                if assert_type == "required_sections":
+                    if not contract.output_sections:
+                        failures.append(
+                            f"intent acceptance failed: `{test.name}` requires output.sections"
+                        )
+                    continue
+                failures.append(
+                    f"intent acceptance failed: unsupported assertion `{assert_type}` in `{test.name}`"
+                )
+    for warning in warnings:
+        print(warning)
+    if failures:
+        for failure in failures:
+            print(failure, file=sys.stderr)
+        return 1
+    print(f"ok - intent acceptance: {checked} assertion(s) checked")
+    return 0
 
 
 def app_uses_call(app: App, name: str) -> bool:

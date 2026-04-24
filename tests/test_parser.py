@@ -15,10 +15,10 @@ def test_parser_accepts_todo_app() -> None:
     app = parse_source(source, path="examples/todo_app.sl")
 
     assert app.name == "TodoApp"
-    assert len(app.types) == 1
+    assert len(app.types) == 2
     assert len(app.stores) == 1
     assert len(app.routes) == 2
-    assert len(app.tests) == 1
+    assert len(app.tests) == 2
 
 
 def test_parser_accepts_module_import_enum_and_intent_test() -> None:

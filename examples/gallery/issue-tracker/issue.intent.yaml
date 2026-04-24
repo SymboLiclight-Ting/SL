@@ -1,6 +1,10 @@
 version: "0.1"
 kind: "IntentSpec"
 
+# sl: route GET /issues
+# sl: command create
+# sl: command list_open
+
 metadata:
   name: "issue_tracker"
   title: "Issue Tracker"
@@ -13,7 +17,7 @@ task:
   priority: "medium"
 
 permissions:
-  web: false
+  web: true
   filesystem:
     read: true
     write: true

@@ -29,3 +29,32 @@ permissions:
     assert contract.permissions.filesystem_write is False
     assert contract.permissions.network is False
     assert contract.permissions.tools["create_file"] is True
+
+
+def test_intent_parser_extracts_output_sections_and_acceptance_tests(tmp_path: Path) -> None:
+    intent = tmp_path / "intent.yaml"
+    intent.write_text(
+        """
+version: "0.1"
+kind: "IntentSpec"
+
+output:
+  format: "markdown"
+  sections:
+    - "Run"
+    - "Test"
+
+tests:
+  - name: "Smoke"
+    assert:
+      - type: "required_sections"
+""",
+        encoding="utf-8",
+    )
+
+    contract = load_intent_contract(intent)
+
+    assert contract.output_sections == ["Run", "Test"]
+    assert len(contract.acceptance_tests) == 1
+    assert contract.acceptance_tests[0].name == "Smoke"
+    assert contract.acceptance_tests[0].assert_types == ["required_sections"]

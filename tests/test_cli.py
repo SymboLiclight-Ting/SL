@@ -126,6 +126,135 @@ tests:
     assert "permission network: ok" in output
 
 
+def test_cli_test_runs_intent_acceptance(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    intent = tmp_path / "app.intent.yaml"
+    source.write_text(
+        """
+app AcceptanceDemo {
+  intent "./app.intent.yaml"
+
+  permissions from intent.permissions
+
+  command ping() -> Text {
+    return "pong"
+  }
+
+  route GET "/ping" -> Text {
+    return "pong"
+  }
+
+  test from intent.acceptance
+}
+""",
+        encoding="utf-8",
+    )
+    intent.write_text(
+        """
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /ping
+# sl: command ping
+
+permissions:
+  web: true
+  filesystem:
+    read: false
+    write: false
+  network: false
+
+metadata:
+  name: "acceptance-demo"
+  title: "Acceptance Demo"
+  owner: "symboliclight"
+
+task:
+  goal: "Check IntentSpec acceptance wiring."
+  audience:
+    - "Application developer"
+  priority: "medium"
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 100
+  sections:
+    - "Run"
+
+tests:
+  - name: "Smoke"
+    assert:
+      - type: "required_sections"
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["test", str(source)]) == 0
+    output = capsys.readouterr().out
+
+    assert "ok - intent acceptance: 1 assertion(s) checked" in output
+
+
+def test_cli_test_fails_intent_acceptance_on_missing_route(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    intent = tmp_path / "app.intent.yaml"
+    source.write_text(
+        """
+app AcceptanceDemo {
+  intent "./app.intent.yaml"
+
+  route GET "/actual" -> Text {
+    return "ok"
+  }
+
+  test from intent.acceptance
+}
+""",
+        encoding="utf-8",
+    )
+    intent.write_text(
+        """
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /missing
+
+permissions:
+  web: true
+
+metadata:
+  name: "acceptance-demo"
+  title: "Acceptance Demo"
+  owner: "symboliclight"
+
+task:
+  goal: "Check IntentSpec acceptance wiring."
+  audience:
+    - "Application developer"
+  priority: "medium"
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 100
+  sections:
+    - "Run"
+
+tests:
+  - name: "Smoke"
+    assert:
+      - type: "required_sections"
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["test", str(source)]) == 1
+    captured = capsys.readouterr()
+
+    assert "intent acceptance failed: missing route GET /missing" in captured.err
+
+
 def test_cli_schema_and_doctor_report_v04_status(tmp_path: Path, capsys) -> None:
     source = tmp_path / "app.sl"
     output = tmp_path / "schema.json"

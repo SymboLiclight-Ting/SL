@@ -95,7 +95,15 @@ Local enum variants use `Status.open`. Imported enum variants use `models.Status
 
 `intent "./file.intent.yaml"` links the implementation to an IntentSpec contract.
 
-`permissions from intent.permissions` and `test from intent.acceptance` are declarative hooks. `slc doctor` reports whether they are present. Full offline acceptance execution remains an integration target.
+`permissions from intent.permissions` imports the app's declared permission contract for diagnostics and acceptance checks.
+
+`test from intent.acceptance` asks `slc test` to run the v0.6 offline acceptance bridge after generated app tests pass. The bridge checks:
+
+- SL-specific IntentSpec hints such as `# sl: route GET /items` and `# sl: command add`,
+- permission mismatches for routes, file reads, and local state writes,
+- IntentSpec `required_sections` assertions against `output.sections`.
+
+Generated Python cannot run IntentSpec acceptance by itself. Direct `python app.py test` treats external tests as skipped; `slc test` is the acceptance-aware entrypoint.
 
 ## Traceability
 

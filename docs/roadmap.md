@@ -80,13 +80,14 @@ Implemented in the current mainline:
 
 - IntentSpec-aware `slc doctor` route and command diffing through `# sl:` hints,
 - permission mismatch reporting for routes, file reads, and local state writes,
+- offline IntentSpec acceptance execution through `slc test` for `test from intent.acceptance`,
 - repeatable release smoke checks through `scripts/release_check.py`,
 - Customer Brief Generator gallery example.
 
 Deferred to later releases:
 
-- executing IntentSpec acceptance tests directly,
 - full structured IntentSpec route schemas once IntentSpec supports those fields,
+- richer IntentSpec assertion execution beyond `required_sections`,
 - PyPI publishing automation,
 - migration fixtures across many historical releases.
 

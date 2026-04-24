@@ -45,7 +45,7 @@ Stable enough to build examples:
 Still experimental:
 
 - `Result<T, E>` expression ergonomics,
-- IntentSpec acceptance execution,
+- IntentSpec acceptance execution beyond the v0.6 offline bridge,
 - permissions enforcement,
 - source-map behavior beyond v0.3 sidecar maps and best-effort runtime backreferences,
 - standard library APIs beyond SQLite, CLI, JSON HTTP, and tests.
@@ -93,5 +93,6 @@ v0.6 hardens release and IntentSpec alignment without changing `.sl` syntax:
 
 - `slc doctor` reads optional `# sl:` hints in IntentSpec files,
 - doctor reports route, command, and permission alignment gaps as report lines, not compiler errors,
+- `slc test` runs the v0.6 offline IntentSpec acceptance bridge when `test from intent.acceptance` is declared,
 - `scripts/release_check.py` centralizes release smoke commands,
 - the Customer Brief Generator gallery example is additive.
