@@ -494,3 +494,51 @@ app Bad {
     diagnostics = check_program(app, source_path=Path("bad.sl"))
 
     assert any("Argument `status` is provided more than once" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_python_keyword_parameters() -> None:
+    source = """
+app Bad {
+  command bad(class: Text) -> Text {
+    return class
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Parameter `class` conflicts with a Python reserved word" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_python_keyword_locals() -> None:
+    source = """
+app Bad {
+  command bad() -> Text {
+    let class = "bad"
+    return class
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Local variable `class` conflicts with a Python reserved word" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_generated_cli_command_names() -> None:
+    source = """
+app Bad {
+  command test() -> Text {
+    return "bad"
+  }
+
+  command serve() -> Text {
+    return "bad"
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Command `test` conflicts with a generated CLI command" in diagnostic.message for diagnostic in diagnostics)
+    assert any("Command `serve` conflicts with a generated CLI command" in diagnostic.message for diagnostic in diagnostics)

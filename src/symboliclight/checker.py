@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import keyword as py_keyword
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,6 +37,8 @@ from symboliclight.parser import parse_source
 PRIMITIVES = {"Bool", "Int", "Float", "Text"}
 GENERIC_ARITY = {"Id": 1, "List": 1, "Option": 1, "Result": 2}
 STORE_METHODS = {"insert", "all", "get", "update", "delete", "filter", "count", "exists", "clear"}
+PYTHON_RESERVED_IDENTIFIERS = set(py_keyword.kwlist)
+GENERATED_CLI_COMMANDS = {"serve", "test"}
 
 
 @dataclass(slots=True)
@@ -85,6 +88,7 @@ class Checker:
     def run_result(self) -> CheckResult:
         self.load_imports()
         self.check_duplicate_names()
+        self.check_codegen_reserved_identifiers()
         if isinstance(self.unit, App):
             self.check_intents()
             self.check_permissions()
@@ -282,6 +286,48 @@ class Checker:
                 if config.name in names:
                     self.error(f"Duplicate declaration `{config.name}`.", config.location, "Use unique names in one app.")
                 names.add(config.name)
+
+    def check_codegen_reserved_identifiers(self) -> None:
+        if isinstance(self.unit, App):
+            for config in self.unit.configs:
+                self.check_python_identifier(config.name, config.location, "Config")
+        for function in self.unit.functions:
+            if isinstance(self.unit, App) and function.kind == "command":
+                if function.name in GENERATED_CLI_COMMANDS:
+                    self.error(
+                        f"Command `{function.name}` conflicts with a generated CLI command.",
+                        function.location,
+                        "Choose a command name other than `serve` or `test`.",
+                        code="SLC090",
+                    )
+                self.check_python_identifier(function.name, function.location, "Command")
+            for param in function.params:
+                self.check_python_identifier(param.name, param.location, "Parameter")
+            self.check_statement_identifiers(function.body)
+        if isinstance(self.unit, App):
+            for route in self.unit.routes:
+                self.check_statement_identifiers(route.body)
+            for test in self.unit.tests:
+                if test.external_ref is None:
+                    self.check_statement_identifiers(test.body)
+
+    def check_statement_identifiers(self, statements: list[Stmt]) -> None:
+        for statement in statements:
+            if isinstance(statement, LetStmt):
+                self.check_python_identifier(statement.name, statement.location, "Local variable")
+            elif isinstance(statement, IfStmt):
+                self.check_statement_identifiers(statement.then_body)
+                self.check_statement_identifiers(statement.else_body)
+
+    def check_python_identifier(self, name: str, location: SourceLocation, kind: str) -> None:
+        if name not in PYTHON_RESERVED_IDENTIFIERS:
+            return
+        self.error(
+            f"{kind} `{name}` conflicts with a Python reserved word.",
+            location,
+            "Choose a different identifier so generated Python remains valid.",
+            code="SLC091",
+        )
 
     def check_intents(self) -> None:
         assert isinstance(self.unit, App)
