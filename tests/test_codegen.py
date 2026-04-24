@@ -476,6 +476,72 @@ app SqlKeywords {
     assert "ok - 1 test(s) passed" in completed.stdout
 
 
+def test_generated_cli_parses_id_params_as_int(tmp_path: Path) -> None:
+    source = """
+app IdCli {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+
+  command has_item(id: Id<Item>) -> Bool {
+    return items.exists(id)
+  }
+}
+"""
+    app = parse_source(source, path="id_cli.sl")
+    diagnostics = check_program(app, source_path=Path("id_cli.sl"))
+    output = tmp_path / "id_cli.py"
+    generated = generate_python(app)
+    output.write_text(generated, encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    assert "has_item_parser.add_argument('id', type=int)" in generated
+    py_compile.compile(str(output), doraise=True)
+    completed = subprocess.run(
+        [sys.executable, str(output), "has_item", "1"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "false" in completed.stdout
+
+
+def test_generated_update_missing_id_fails_explicitly(tmp_path: Path) -> None:
+    source = """
+app MissingUpdate {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item
+
+  command missing() -> Item {
+    return items.update(999, { title: "ghost" })
+  }
+}
+"""
+    app = parse_source(source, path="missing_update.sl")
+    diagnostics = check_program(app, source_path=Path("missing_update.sl"))
+    output = tmp_path / "missing_update.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    completed = subprocess.run(
+        [sys.executable, str(output), "missing"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode != 0
+    assert "items.update id not found: 999" in completed.stderr
+
+
 def test_generated_schema_drift_does_not_overwrite_existing_hash(tmp_path: Path) -> None:
     source = """
 app DriftRuntime {

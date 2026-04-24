@@ -23,7 +23,7 @@ Records and enums define the stable application data surface.
 
 Named arguments are checked against declared function and command parameters. Unknown, duplicate, and missing arguments are rejected. Positional arguments may not follow named arguments.
 
-`Response<T>` represents a JSON HTTP response wrapper. In v0.4 it carries status, optional headers, and body only.
+`Response<T>` represents a JSON HTTP response wrapper. In v0.4 it carries status, optional headers, and body only. Inline record bodies are checked against the declared `T`; the same target-aware check applies through `ok(...)`, `err(...)`, and `some(...)` wrappers where the expected type is known.
 
 ## Function Boundary
 
@@ -50,7 +50,9 @@ Supported store methods:
 
 `insert` and `update` require record literals in v0.4. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
 
-`get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
+`get`, `update`, and `delete` require an `Int` or `Id<T>` id argument. `Id<T>` is preferred at command and request-body boundaries because it preserves the target store identity while still compiling to an integer in generated Python.
+
+`update(id, record)` raises a runtime error if no row exists for the id. This keeps the declared return type `T` honest without introducing a breaking `Option<T>` return in v0.7.
 
 `filter` requires named arguments and validates field value types.
 

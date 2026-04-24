@@ -243,7 +243,9 @@ class PythonGenerator:
             "",
             f"def {store_name}_update(item_id, item):",
             "    item = dict(item)",
-            f"    conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = ?', [{values}, item_id])",
+            f"    cursor = conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = ?', [{values}, item_id])",
+            "    if cursor.rowcount == 0:",
+            f"        raise KeyError(f'{store_name}.update id not found: {{item_id}}')",
             "    conn().commit()",
             f"    return {store_name}_get(item_id)",
             "",
@@ -503,7 +505,7 @@ class PythonGenerator:
             for param in function.params:
                 if param.type_ref.name == "Bool":
                     lines.append(f"    {function.name}_parser.add_argument('--{param.name}', action='store_true')")
-                elif param.type_ref.name == "Int":
+                elif param.type_ref.name in {"Int", "Id"}:
                     lines.append(f"    {function.name}_parser.add_argument({param.name!r}, type=int)")
                 elif param.type_ref.name == "Float":
                     lines.append(f"    {function.name}_parser.add_argument({param.name!r}, type=float)")

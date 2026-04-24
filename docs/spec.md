@@ -108,7 +108,9 @@ todos.clear() -> Int
 
 `insert` and `update` require record literals in v0.4. The checker validates unknown fields, duplicate fields, missing required fields, and obvious field type mismatches.
 
-`get`, `update`, and `delete` require an `Int` or `Id<T>` id argument.
+`get`, `update`, and `delete` require an `Int` or `Id<T>` id argument. `Id<T>` parameters at CLI boundaries are parsed as integers in generated Python. The checker accepts `Int` for compatibility but suggests `Id<T>` for named id values where it can preserve store identity.
+
+`update(id, record)` returns `T` and raises a generated runtime error if the id does not exist.
 
 `filter` requires named arguments and validates each filter value against the matching record field type. Other store methods use positional arguments.
 

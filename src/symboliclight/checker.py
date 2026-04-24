@@ -559,31 +559,65 @@ class Checker:
         expected_return: TypeRef,
         env: dict[str, TypeRef],
     ) -> None:
+        self.validate_expr_against_target(expr, expected_return, env=env, allow_missing_id=False)
+
+    def validate_expr_against_target(
+        self,
+        expr: Expr,
+        expected: TypeRef,
+        *,
+        env: dict[str, TypeRef],
+        allow_missing_id: bool,
+    ) -> None:
         if isinstance(expr, RecordExpr):
             self.validate_record_expr(
                 expr,
-                expected_return,
-                allow_missing_id=False,
+                expected,
+                allow_missing_id=allow_missing_id,
                 env=env,
             )
             return
-        response_body = self.response_body_expr(expr)
-        if response_body is None or not isinstance(response_body, RecordExpr):
+        if not isinstance(expr, CallExpr):
             return
-        target = self.response_body_target(expected_return)
-        if target is None:
+        if expected.name == "Response" and expected.args and expr.callee == ["response"]:
+            response_body = self.response_body_expr(expr)
+            if response_body is not None:
+                self.validate_expr_against_target(
+                    response_body,
+                    expected.args[0],
+                    env=env,
+                    allow_missing_id=False,
+                )
             return
-        self.validate_record_expr(
-            response_body,
-            target,
-            allow_missing_id=False,
-            env=env,
-        )
-
-    def response_body_target(self, expected_return: TypeRef) -> TypeRef | None:
-        if expected_return.name != "Response" or not expected_return.args:
-            return None
-        return expected_return.args[0]
+        if expected.name == "Result" and len(expected.args) == 2:
+            if expr.callee == ["ok"]:
+                wrapper_arg = self.first_positional_expr(expr)
+                if wrapper_arg is not None:
+                    self.validate_expr_against_target(
+                        wrapper_arg,
+                        expected.args[0],
+                        env=env,
+                        allow_missing_id=False,
+                    )
+            elif expr.callee == ["err"]:
+                wrapper_arg = self.first_positional_expr(expr)
+                if wrapper_arg is not None:
+                    self.validate_expr_against_target(
+                        wrapper_arg,
+                        expected.args[1],
+                        env=env,
+                        allow_missing_id=False,
+                    )
+            return
+        if expected.name == "Option" and expected.args and expr.callee == ["some"]:
+            wrapper_arg = self.first_positional_expr(expr)
+            if wrapper_arg is not None:
+                self.validate_expr_against_target(
+                    wrapper_arg,
+                    expected.args[0],
+                    env=env,
+                    allow_missing_id=False,
+                )
 
     def response_body_expr(self, expr: Expr) -> Expr | None:
         if not isinstance(expr, CallExpr) or expr.callee != ["response"]:
@@ -596,6 +630,12 @@ class Checker:
                 if positional_index == 1:
                     return arg.expr
                 positional_index += 1
+        return None
+
+    def first_positional_expr(self, expr: CallExpr) -> Expr | None:
+        for arg in expr.args:
+            if arg.name is None:
+                return arg.expr
         return None
 
     def infer_expr(self, expr: Expr, env: dict[str, TypeRef], *, context_kind: str | None = None) -> TypeRef:
@@ -1110,7 +1150,16 @@ class Checker:
             return
         actual = self.infer_expr(expr.args[0].expr, env)
         expected = TypeRef("Id", [item_type])
-        if actual.name != "Int" and not self.type_matches(expected, actual):
+        if actual.name == "Int":
+            if not isinstance(expr.args[0].expr, LiteralExpr):
+                self.warn(
+                    f"`{'.'.join(expr.callee)}` id accepts `Int`, but `{expected.render()}` is more precise.",
+                    expr.args[0].location,
+                    f"Prefer declaring ids at command or request-body boundaries as `{expected.render()}`.",
+                    code="SLC052",
+                )
+            return
+        if not self.type_matches(expected, actual):
             self.error(
                 f"`{'.'.join(expr.callee)}` id expected `Int` or `{expected.render()}`, found `{actual.render()}`.",
                 expr.args[0].location,
@@ -1119,6 +1168,14 @@ class Checker:
 
     def infer_wrapper_constructor(self, expr: CallExpr, env: dict[str, TypeRef]) -> TypeRef:
         callee = expr.callee[0]
+        for arg in expr.args:
+            if arg.name is not None:
+                self.error(
+                    f"`{callee}` does not accept named arguments.",
+                    arg.location,
+                    "Use positional arguments for wrapper constructors.",
+                    code="SLC053",
+                )
         if callee == "none":
             self.expect_arg_count(expr, 0)
             return TypeRef("Option", [TypeRef("Unknown")])
@@ -1278,6 +1335,16 @@ class Checker:
         code: str = "SLC001",
     ) -> None:
         self.diagnostics.append(Diagnostic(message, location, suggestion, code=code))
+
+    def warn(
+        self,
+        message: str,
+        location: SourceLocation,
+        suggestion: str,
+        *,
+        code: str = "SLCW001",
+    ) -> None:
+        self.diagnostics.append(Diagnostic(message, location, suggestion, severity="warning", code=code))
 
 
 def check_program(unit: Unit, *, source_path: Path, strict_intent: bool = False) -> list[Diagnostic]:

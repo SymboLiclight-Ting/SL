@@ -7,6 +7,9 @@
 - Added read-only `slc doctor --db` schema drift inspection.
 - Added release smoke coverage for the fifth gallery app.
 - Documented v0.7 auth and migration boundaries.
+- Tightened target-aware record validation through `Response<T>`, `Result<T, E>`, and `Option<T>` wrappers.
+- Improved `Id<T>` ergonomics for CLI parameters and store id diagnostics.
+- Made generated `store.update` fail explicitly when the target id does not exist.
 
 ## v0.6.0
 

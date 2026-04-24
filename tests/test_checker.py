@@ -181,6 +181,52 @@ app Bad {
     assert any("id expected `Int`" in diagnostic.message for diagnostic in diagnostics)
 
 
+def test_checker_warns_when_store_id_uses_int_boundary() -> None:
+    source = """
+app WarnId {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command load(id: Int) -> Option<Todo> {
+    return todos.get(id)
+  }
+}
+"""
+    app = parse_source(source, path="warn_id.sl")
+    diagnostics = check_program(app, source_path=Path("warn_id.sl"))
+
+    assert any(
+        diagnostic.severity == "warning" and "Id<Todo>` is more precise" in diagnostic.message
+        for diagnostic in diagnostics
+    )
+
+
+def test_checker_accepts_typed_store_id_boundary_without_warning() -> None:
+    source = """
+app GoodId {
+  type Todo = {
+    id: Id<Todo>,
+    title: Text,
+  }
+
+  store todos: Todo
+
+  command load(id: Id<Todo>) -> Option<Todo> {
+    return todos.get(id)
+  }
+}
+"""
+    app = parse_source(source, path="good_id.sl")
+    diagnostics = check_program(app, source_path=Path("good_id.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "warning"]
+
+
 def test_checker_rejects_named_args_for_non_filter_store_methods() -> None:
     source = """
 app Bad {
@@ -449,6 +495,57 @@ app Good {
     diagnostics = check_program(app, source_path=Path("good.sl"))
 
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_response_result_ok_record_literal_missing_field() -> None:
+    source = """
+app Bad {
+  type PublicTodo = {
+    title: Text,
+    done: Bool,
+  }
+
+  route GET "/todo" -> Response<Result<PublicTodo, Text>> {
+    return response(status: 200, body: ok({ title: "Buy milk" }))
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("Missing required field `done`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_response_result_err_record_literal_unknown_field() -> None:
+    source = """
+app Bad {
+  type ErrorBody = {
+    message: Text,
+  }
+
+  route GET "/todo" -> Response<Result<Text, ErrorBody>> {
+    return response(status: 400, body: err({ message: "bad", detail: "extra" }))
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("has no field `detail`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_named_args_for_wrapper_constructors() -> None:
+    source = """
+app Bad {
+  command bad() -> Result<Text, Text> {
+    return ok(value: "done")
+  }
+}
+"""
+    app = parse_source(source, path="bad.sl")
+    diagnostics = check_program(app, source_path=Path("bad.sl"))
+
+    assert any("does not accept named arguments" in diagnostic.message for diagnostic in diagnostics)
 
 
 def test_checker_accepts_request_header_in_routes() -> None:

@@ -11,7 +11,7 @@ app SmallAdminBackend {
   }
 
   type DisableAdmin = {
-    id: Int,
+    id: Id<AdminUser>,
     name: Text,
     email: Text,
     reason: Text,
@@ -66,7 +66,7 @@ app SmallAdminBackend {
     return users.all()
   }
 
-  command disable_admin(id: Int, name: Text, email: Text, reason: Text) -> AdminUser {
+  command disable_admin(id: Id<AdminUser>, name: Text, email: Text, reason: Text) -> AdminUser {
     let user = users.update(id, {
       name: name,
       email: email,
@@ -139,7 +139,7 @@ app SmallAdminBackend {
   test "admin lifecycle" {
     let user = create_admin("Ada", "ada@example.com")
     assert users.count() == 1
-    let disabled = disable_admin(1, user.name, user.email, "left team")
+    let disabled = disable_admin(user.id, user.name, user.email, "left team")
     assert disabled.active == false
     assert audit_events.count() == 2
   }
