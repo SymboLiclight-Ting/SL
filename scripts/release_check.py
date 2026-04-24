@@ -58,7 +58,7 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
         )
     if not skip_package:
         commands.append([python, "-m", "build"])
-        commands.append([python, "scripts/package_smoke.py"])
+        commands.append([python, "scripts/package_smoke.py", "--gallery"])
     return commands
 
 

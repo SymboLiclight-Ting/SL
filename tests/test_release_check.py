@@ -24,4 +24,4 @@ def test_release_check_includes_package_smoke_when_not_skipped() -> None:
     commands = [" ".join(command) for command in release_commands(skip_package=False)]
 
     assert any(command.endswith(" -m build") for command in commands)
-    assert any("scripts/package_smoke.py" in command for command in commands)
+    assert any("scripts/package_smoke.py --gallery" in command for command in commands)

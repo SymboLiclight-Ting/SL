@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install the built SL wheel and run smoke checks.")
     parser.add_argument("--wheel", type=Path)
+    parser.add_argument("--gallery", action="store_true", help="Run gallery examples from an empty workspace.")
     args = parser.parse_args(argv)
     wheel = args.wheel or latest_wheel()
     if wheel is None:
@@ -33,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
         run([str(python), "-m", "py_compile", str(built)], isolated=True)
         run([str(python), str(built), "test"], isolated=True)
         run([str(slc_command(venv_dir)), "--help"], isolated=True)
+        if args.gallery:
+            run_gallery_smoke(slc_command(venv_dir), temp)
     print(f"ok - package smoke passed for {wheel.name}")
     return 0
 
@@ -52,6 +56,19 @@ def slc_command(venv_dir: Path) -> Path:
     if sys.platform == "win32":
         return venv_dir / "Scripts" / "slc.exe"
     return venv_dir / "bin" / "slc"
+
+
+def run_gallery_smoke(slc: Path, temp: Path) -> None:
+    workspace = temp / "workspace"
+    gallery = workspace / "gallery"
+    shutil.copytree(ROOT / "examples" / "gallery", gallery)
+    for app in sorted(gallery.glob("*/app.sl")):
+        stem = app.parent.name
+        schema_out = workspace / f"{stem}_schema.json"
+        run([str(slc), "check", str(app)], isolated=True)
+        run([str(slc), "test", str(app)], isolated=True)
+        run([str(slc), "schema", str(app), "--out", str(schema_out)], isolated=True)
+        run([str(slc), "doctor", str(app)], isolated=True)
 
 
 def run(command: list[str], *, isolated: bool = False) -> None:

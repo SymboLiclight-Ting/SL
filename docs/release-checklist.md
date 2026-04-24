@@ -15,5 +15,7 @@
 - Confirm `slc lsp --help` is available.
 - Run `python scripts/release_check.py --skip-package`.
 - Run `python -m build`.
-- Run `python scripts/package_smoke.py`.
+- Run `python scripts/package_smoke.py --gallery`.
 - Run `python scripts/release_check.py` for the full package-inclusive release gate.
+- For release candidates, build with a PEP 440 pre-release version such as `0.6.0rc1`.
+- Upload only the matching release-candidate artifacts to TestPyPI.

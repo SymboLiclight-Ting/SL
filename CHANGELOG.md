@@ -2,12 +2,13 @@
 
 ## v0.6.0
 
+- Prepared `0.6.0rc1` packaging for the `v0.6.0-rc1` release candidate.
 - Added IntentSpec-aware `slc doctor` diffing for SL route and command hints.
 - Added offline IntentSpec acceptance checks through `slc test` for `test from intent.acceptance`.
 - Added permission mismatch reporting for routes, local state writes, and file reads/writes.
 - Hardened route handler names, SQLite identifier quoting, and formatter string escaping.
 - Added `scripts/release_check.py` for repeatable release smoke checks.
-- Added wheel install smoke checks for release candidates.
+- Added wheel install smoke checks for release candidates, including installed-`slc` gallery runs from an empty workspace.
 - Added the Customer Brief Generator gallery example.
 - Documented v0.6 release hardening behavior.
 
