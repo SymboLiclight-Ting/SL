@@ -4,9 +4,10 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from symboliclight.ast import App
 from symboliclight.checker import check_program_result
 from symboliclight.codegen import generate_python
-from symboliclight.diagnostics import Diagnostic
+from symboliclight.diagnostics import Diagnostic, SourceLocation
 from symboliclight.parser import parse_source_result
 
 
@@ -20,6 +21,14 @@ def compile_source(source: str) -> dict[str, object]:
         diagnostics.extend(check_program_result(result.unit, source_path=Path("<playground>")).diagnostics)
     if result.unit is None or any(item.severity == "error" for item in diagnostics):
         return {"ok": False, "diagnostics": [item.to_dict() for item in diagnostics]}
+    if not isinstance(result.unit, App):
+        diagnostic = Diagnostic(
+            "Playground can only compile app files.",
+            result.unit.location if result.unit is not None else SourceLocation("<playground>", 1, 1),
+            "Use `app Name { ... }` for playground compilation. Modules are imported by apps.",
+            code="SLP100",
+        )
+        return {"ok": False, "diagnostics": [diagnostic.to_dict()]}
     return {"ok": True, "python": generate_python(result.unit), "diagnostics": [item.to_dict() for item in diagnostics]}
 
 
@@ -40,13 +49,23 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         length = int(self.headers.get("Content-Length", "0"))
-        payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+        except json.JSONDecodeError as exc:
+            self.write_json(400, {"ok": False, "diagnostics": [{"message": f"Malformed JSON: {exc.msg}"}]})
+            return
         response = json.dumps(compile_source(str(payload.get("source", "")))).encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(response)))
+        self.write_bytes(200, response, "application/json")
+
+    def write_json(self, status: int, payload: dict[str, object]) -> None:
+        self.write_bytes(status, json.dumps(payload).encode("utf-8"), "application/json")
+
+    def write_bytes(self, status: int, content: bytes, content_type: str) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(content)))
         self.end_headers()
-        self.wfile.write(response)
+        self.wfile.write(content)
 
 
 def main() -> None:

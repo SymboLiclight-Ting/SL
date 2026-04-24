@@ -4,6 +4,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.request import url2pathname
 from urllib.parse import unquote, urlparse
 
 from symboliclight.ast import App, FieldDecl, TypeDecl, Unit
@@ -156,22 +157,21 @@ def hover_at(uri: str, text: str, line: int, character: int) -> dict[str, object
     unit = parsed_unit(uri, text)
     if unit is None:
         return None
-    type_name = infer_hover_type(unit, token)
+    type_name = infer_hover_type(unit, token, line=line)
     if type_name is None:
         return None
     return {"contents": {"kind": "markdown", "value": f"`{token}: {type_name}`"}}
 
 
-def infer_hover_type(unit: Unit, token: str) -> str | None:
+def infer_hover_type(unit: Unit, token: str, *, line: int | None = None) -> str | None:
     if isinstance(unit, App) and token.startswith("request.body."):
         field_name = token.split(".")[-1]
-        for route in unit.routes:
-            if route.body_type is None:
-                continue
-            type_decl = find_type(unit, route.body_type.name)
-            field = find_field(type_decl, field_name) if type_decl else None
-            if field is not None:
-                return field.type_ref.render()
+        route = route_at_line(unit, line) if line is not None else None
+        if route is None or route.body_type is None:
+            return None
+        type_decl = find_type(unit, route.body_type.name)
+        field = find_field(type_decl, field_name) if type_decl else None
+        return field.type_ref.render() if field is not None else None
     for type_decl in unit.types:
         if token == type_decl.name:
             return "type"
@@ -295,6 +295,16 @@ def find_field(type_decl: TypeDecl | None, name: str) -> FieldDecl | None:
     return next((field for field in type_decl.fields if field.name == name), None)
 
 
+def route_at_line(unit: App, zero_based_line: int | None) -> object | None:
+    if zero_based_line is None:
+        return None
+    one_based_line = zero_based_line + 1
+    candidates = [route for route in unit.routes if route.location.line <= one_based_line]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda route: route.location.line)
+
+
 def token_at(text: str, line: int, character: int) -> str | None:
     lines = text.splitlines()
     if line < 0 or line >= len(lines):
@@ -338,5 +348,10 @@ def diagnostic_to_lsp(diagnostic: Diagnostic) -> dict[str, object]:
 def path_from_uri(uri: str) -> Path:
     if uri.startswith("file://"):
         parsed = urlparse(uri)
-        return Path(unquote(parsed.path.lstrip("/")) if parsed.netloc == "" else f"//{parsed.netloc}{unquote(parsed.path)}")
+        if parsed.netloc:
+            return Path(url2pathname(f"//{parsed.netloc}{parsed.path}"))
+        decoded = url2pathname(unquote(parsed.path))
+        if len(decoded) >= 3 and decoded[0] == "/" and decoded[2] == ":":
+            decoded = decoded[1:]
+        return Path(decoded)
     return Path(uri or "<memory>").resolve()

@@ -7,6 +7,7 @@ from symboliclight.lsp import (
     document_symbols,
     formatting_edits,
     hover_at,
+    path_from_uri,
 )
 
 
@@ -43,6 +44,37 @@ app Demo {
 
     assert hover is not None
     assert "`request.body.title: Text`" in json.dumps(hover)
+
+
+def test_lsp_hover_uses_enclosing_route_body_type(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    text = """
+app Demo {
+  type FirstBody = {
+    shared: Text,
+  }
+
+  type SecondBody = {
+    shared: Int,
+  }
+
+  route POST "/first" body FirstBody -> Text {
+    return request.body.shared
+  }
+
+  route POST "/second" body SecondBody -> Int {
+    return request.body.shared
+  }
+}
+"""
+    lines = text.splitlines()
+    line = [index for index, item in enumerate(lines) if "request.body.shared" in item][-1]
+    character = lines[line].index("shared")
+
+    hover = hover_at(source.as_uri(), text, line, character)
+
+    assert hover is not None
+    assert "`request.body.shared: Int`" in json.dumps(hover)
 
 
 def test_lsp_document_symbols_cover_core_declarations(tmp_path: Path) -> None:
@@ -99,3 +131,11 @@ app Demo {
     assert edits is None
     assert error is not None
     assert "comments" in error
+
+
+def test_lsp_path_from_uri_preserves_posix_absolute_path() -> None:
+    assert str(path_from_uri("file:///tmp/app.sl")).replace("\\", "/") == "/tmp/app.sl"
+
+
+def test_lsp_path_from_uri_preserves_windows_drive_path() -> None:
+    assert str(path_from_uri("file:///D:/tmp/app.sl")).replace("\\", "/") == "D:/tmp/app.sl"
