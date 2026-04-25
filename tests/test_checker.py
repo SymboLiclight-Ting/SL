@@ -618,6 +618,29 @@ app Good {
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
 
 
+def test_checker_accepts_response_err_with_custom_error_body_name() -> None:
+    source = """
+app Good {
+  type ApiError = {
+    code: Text,
+    message: Text,
+  }
+
+  type Todo = {
+    title: Text,
+  }
+
+  route GET "/todo" -> Response<Result<Todo, ApiError>> {
+    return response_err(status: 404, code: "not_found", message: "Todo not found.")
+  }
+}
+"""
+    app = parse_source(source, path="good.sl")
+    diagnostics = check_program(app, source_path=Path("good.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
 def test_checker_rejects_response_ok_record_literal_missing_field() -> None:
     source = """
 app Bad {

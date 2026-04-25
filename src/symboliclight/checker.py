@@ -1112,13 +1112,13 @@ class Checker:
             status_arg = args.get("status")
             body_arg = args.get("body")
             if status_arg is None or body_arg is None:
-                return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("ErrorBody")])])
+                return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("Unknown")])])
             status_type = self.infer_expr(status_arg.expr, env, context_kind=context_kind)
             if status_type.name != "Int":
                 self.error("response_ok status requires Int.", status_arg.location, "Pass an integer HTTP status.")
             body_type = self.infer_expr(body_arg.expr, env, context_kind=context_kind)
             self.check_response_headers(args, env, context_kind)
-            return TypeRef("Response", [TypeRef("Result", [body_type, TypeRef("ErrorBody")])])
+            return TypeRef("Response", [TypeRef("Result", [body_type, TypeRef("Unknown")])])
         if name == "response_err":
             args = self.bind_builtin_args(
                 expr,
@@ -1127,14 +1127,14 @@ class Checker:
             )
             status_arg = args.get("status")
             if status_arg is None:
-                return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("ErrorBody")])])
+                return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("Unknown")])])
             status_type = self.infer_expr(status_arg.expr, env, context_kind=context_kind)
             if status_type.name != "Int":
                 self.error("response_err status requires Int.", status_arg.location, "Pass an integer HTTP status.")
             self.check_bound_arg_type(args, env, "code", TypeRef("Text"), context_kind)
             self.check_bound_arg_type(args, env, "message", TypeRef("Text"), context_kind)
             self.check_response_headers(args, env, context_kind)
-            return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("ErrorBody")])])
+            return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), TypeRef("Unknown")])])
         if name == "env":
             args = self.bind_builtin_args(expr, ["name", "default"], required=["name", "default"])
             self.check_bound_arg_type(args, env, "name", TypeRef("Text"), context_kind)

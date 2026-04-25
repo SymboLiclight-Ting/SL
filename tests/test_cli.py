@@ -4,6 +4,7 @@ import py_compile
 import sqlite3
 
 from symboliclight.cli import load_checked_unit, main
+from symboliclight.checker import check_program_result
 from symboliclight.codegen import generate_schema_hash
 from symboliclight.parser import parse_source
 
@@ -368,6 +369,83 @@ app DriftDemo {
     assert stored == "old"
 
 
+def test_cli_doctor_reports_structural_drift_when_hash_matches(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    text = """
+app DriftDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+    done: Bool,
+  }
+
+  store items: Item
+}
+"""
+    source.write_text(text, encoding="utf-8")
+    app = parse_source(text, path=str(source))
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute(
+            "INSERT INTO sl_migrations (version, schema_hash) VALUES (1, ?)",
+            [generate_schema_hash(app)],
+        )
+        database.execute("CREATE TABLE items (id INTEGER, title TEXT)")
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["doctor", str(source), "--db", str(db_path)]) == 0
+    doctor = capsys.readouterr().out
+
+    assert "schema drift: structural drift detected" in doctor
+    assert "schema diff: missing column items.done" in doctor
+
+
+def test_cli_doctor_schema_diff_resolves_imported_store_type(tmp_path: Path, capsys) -> None:
+    (tmp_path / "models.sl").write_text(
+        """
+module models {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+    done: Bool,
+  }
+}
+""",
+        encoding="utf-8",
+    )
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    text = """
+app DriftDemo {
+  import "./models.sl" as models
+
+  store items: models.Item
+}
+"""
+    source.write_text(text, encoding="utf-8")
+    app = parse_source(text, path=str(source))
+    check_program_result(app, source_path=source)
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute("INSERT INTO sl_migrations (version, schema_hash) VALUES (1, 'old')")
+        database.execute("CREATE TABLE items (id INTEGER, title TEXT)")
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["doctor", str(source), "--db", str(db_path)]) == 0
+    doctor = capsys.readouterr().out
+
+    assert "schema diff: missing column items.done" in doctor
+    assert "schema diff: extra column items.id" not in doctor
+    assert "schema diff: extra column items.title" not in doctor
+
+
 def test_cli_doctor_reports_uninitialized_schema_db(tmp_path: Path, capsys) -> None:
     source = tmp_path / "app.sl"
     db_path = tmp_path / "missing.sqlite"
@@ -409,6 +487,7 @@ app DriftDemo {
     database = sqlite3.connect(db_path)
     try:
         database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute('CREATE TABLE "items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT)')
         database.execute(
             "INSERT INTO sl_migrations (version, schema_hash) VALUES (1, ?)",
             [generate_schema_hash(app)],

@@ -327,11 +327,21 @@ def schema_drift_lines(app: App, db_path: Path) -> list[str]:
                 return [f"- schema drift: not initialized ({db_path})"]
             expected = generate_schema_hash(app)
             actual = str(row["schema_hash"])
+            diff_lines = schema_diff_lines(app, database)
+            if actual == expected and not diff_lines:
+                return [
+                    f"- schema drift: up to date ({db_path})",
+                    "- schema diff: no structural difference detected",
+                ]
             if actual == expected:
-                return [f"- schema drift: up to date ({db_path})"]
+                return [
+                    f"- schema drift: structural drift detected ({db_path})",
+                    *diff_lines,
+                    "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
+                ]
             return [
                 f"- schema drift: drift detected ({db_path})",
-                *schema_diff_lines(app, database),
+                *diff_lines,
                 "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
             ]
         finally:
@@ -370,19 +380,31 @@ def schema_diff_lines(app: App, database: sqlite3.Connection) -> list[str]:
             lines.append(f"- schema diff: extra column {table_name}.{column_name}")
     for table_name in sorted(set(actual_tables) - set(expected_tables) - ignored_tables):
         lines.append(f"- schema diff: extra table {table_name}")
-    if not lines:
-        lines.append("- schema diff: no structural difference detected")
     return lines
 
 
 def expected_columns_for_store(app: App, type_ref: TypeRef) -> dict[str, str]:
-    type_decl = next((decl for decl in app.types if decl.name == type_ref.name), None)
+    type_decl = type_decl_for_app(app, type_ref.name)
     if type_decl is None:
         return {}
     columns: dict[str, str] = {}
     for field in type_decl.fields:
         columns[field.name] = "INTEGER" if field.name == "id" else sqlite_type_for_doctor(field.type_ref)
     return columns
+
+
+def type_decl_for_app(app: App, name: str):
+    for type_decl in app.types:
+        if type_decl.name == name:
+            return type_decl
+    if "." in name:
+        alias, type_name = name.split(".", 1)
+        module = app.imported_modules.get(alias)
+        if module is not None:
+            for type_decl in module.types:
+                if type_decl.name == type_name:
+                    return type_decl
+    return None
 
 
 def actual_schema(database: sqlite3.Connection) -> dict[str, dict[str, str]]:
