@@ -120,18 +120,34 @@ Implemented in the current mainline:
 Deferred to later releases:
 
 - PyPI release flow,
-- documentation site,
-- compatibility test suite across prior examples,
+- hosted documentation site,
 - generated migration SQL.
 
-## v0.9 Candidate Direction
+## v0.9 DX Stabilization
+
+Implemented in the current mainline:
+
+- comment-preserving formatter support for common `//` comment trivia,
+- machine-readable `slc doctor --json` reports,
+- broader LSP hover, definition, document symbols, and formatting coverage,
+- compatibility fixtures across v0.6, v0.7, and v0.8 examples,
+- Markdown documentation site skeleton under `docs/site/`.
+
+Deferred to later releases:
+
+- semantic tokens and richer IDE refactors,
+- generated migration SQL,
+- hosted documentation publishing,
+- PyPI release automation.
+
+## v0.10 Candidate Direction
 
 Likely next work:
 
-- comment-preserving formatter,
-- stronger IDE/LSP polish,
 - richer migration planning without automatic data mutation,
-- compatibility fixtures across v0.6, v0.7, and v0.8 examples.
+- route and command ergonomics based on real app feedback,
+- hosted docs preview,
+- package publishing rehearsal when the project owner is ready.
 
 ## v1.0 Stable
 

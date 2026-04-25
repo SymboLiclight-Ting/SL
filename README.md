@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.8 developer preview supports:
+The v0.9 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -41,6 +41,7 @@ The v0.8 developer preview supports:
 - source-map sidecars and best-effort `.sl` runtime backreferences.
 - incremental `slc check` cache reuse.
 - JSON diagnostics for tools through `slc check --json`.
+- machine-readable doctor reports through `slc doctor --json`.
 - developer-preview LSP through `slc lsp`.
 - local VS Code syntax, snippets, and language-server wiring under `editors/vscode`.
 - local playground under `playground/`.
@@ -48,6 +49,7 @@ The v0.8 developer preview supports:
 - IntentSpec acceptance checks through `slc test` for apps that declare `test from intent.acceptance`.
 - route auth checks through the minimal `request.header(...)` helper.
 - schema drift inspection through `slc doctor --db`.
+- comment-preserving formatting for common `//` comment positions.
 - repeatable release smoke checks through `scripts/release_check.py`.
 
 ## Quick Start
@@ -60,7 +62,9 @@ slc build examples/todo_app.sl --out build/todo_app.py
 slc schema examples/notes_api.sl --out build/notes_schema.json
 slc fmt examples/todo_app.sl --check
 slc doctor examples/todo_app.sl
+slc doctor examples/todo_app.sl --json
 slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite
+slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite --json
 slc lsp
 python build/todo_app.py test
 python build/todo_app.py add "Buy milk"
@@ -168,7 +172,9 @@ slc run <file.sl> -- add "Buy milk"
 slc test <file.sl>
 slc fmt <file.sl>
 slc doctor <file.sl>
+slc doctor <file.sl> --json
 slc doctor <file.sl> --db path/to/app.sqlite
+slc doctor <file.sl> --db path/to/app.sqlite --json
 slc lsp
 slc init <dir>
 slc new api <name>
@@ -184,7 +190,7 @@ python scripts/package_smoke.py --gallery
 python scripts/release_check.py
 ```
 
-For a local `v0.8.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, and exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column. No TestPyPI or PyPI upload is performed by these commands.
+For a local `v0.9.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
 
 ## Project Status
 

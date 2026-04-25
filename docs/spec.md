@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.8
+# SymbolicLight Language Specification v0.9
 
-This document defines SymbolicLight v0.8 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.9 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -270,20 +270,22 @@ slc run <path> -- <generated-app-args>
 slc test <path>
 slc fmt <path>
 slc doctor <path>
+slc doctor <path> --json
 slc doctor <path> --db path/to/app.sqlite
+slc doctor <path> --db path/to/app.sqlite --json
 slc lsp
 slc init <dir>
 slc new api <name>
 slc add route GET /items <path>
 ```
 
-`slc fmt` is intentionally conservative in v0.4. It refuses to rewrite files containing `//` comments because the formatter does not yet have comment-preserving trivia support.
+`slc fmt` is the official formatter. v0.9 preserves `//` comments in common positions: file headers, comments before top-level items, comments before statements, and trailing comments. Formatting is intended to be idempotent. `slc add route` remains conservative and may still refuse to edit commented files when it cannot safely locate the app block.
 
 `slc check --json` emits a machine-readable diagnostics array with `severity`, `code`, `message`, `file`, `line`, `column`, and `suggestion`.
 
 `slc schema` emits deterministic JSON schema metadata for records, enums, route bodies, and route responses. It does not depend on generated Python.
 
-`slc lsp` starts the developer-preview JSON-RPC language server over stdio. v0.5 supports diagnostics, hover, definition, document symbols, and formatting.
+`slc lsp` starts the developer-preview JSON-RPC language server over stdio. v0.9 supports diagnostics, hover, definition, document symbols, and whole-document formatting through the comment-preserving formatter.
 
 `slc init <dir>` creates `src/app.sl`, `intent/app.intent.yaml`, `README.md`, and `.gitignore`. `slc new api <name>` creates the same project shape under `<name>/`. `slc add route` refuses to edit files that contain `//` comments or parser errors.
 
@@ -299,6 +301,8 @@ These hints avoid adding nonstandard top-level fields to IntentSpec while still 
 The same hints are used by `slc test` when `test from intent.acceptance` is declared. Missing hinted routes or commands fail offline acceptance. Extra routes or commands are reported as warnings.
 
 `slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and the actual SQLite table structure. `schema drift: up to date` means the stored hash matches the generated hash. `schema diff: no structural difference detected` means the actual SQLite structure also matches. If the hash matches but the structure differs, doctor reports `schema drift: structural drift detected`. If the hash differs, doctor reports `schema drift: drift detected` and still includes summary schema differences. Diff lines use stable release-facing forms: `missing table`, `extra table`, `missing column`, `extra column`, and `type mismatch`. The command never mutates the database and does not perform automatic migrations.
+
+`slc doctor --json` emits a machine-readable report with `source`, `unit`, `diagnostics`, `summary`, `intent`, `schema`, `cache`, and `source_map`. `schema.drift` uses stable enum values: `not_checked`, `not_initialized`, `up_to_date`, `structural_drift`, `hash_drift`, and `unable_to_inspect`. `schema.diff` is an array of objects with `kind` values such as `missing_table`, `extra_table`, `missing_column`, `extra_column`, and `type_mismatch`.
 
 ## Generated Python Contract
 
@@ -340,7 +344,7 @@ severity + code + message + file + line + column + suggestion
 
 Parser diagnostics use `SLP...` codes. Checker diagnostics use `SLC...` codes. Lexer diagnostics use `SLL...` codes.
 
-## Out Of Scope Before v0.5
+## Out Of Scope Before v1.0
 
 - frontend UI,
 - package manager,

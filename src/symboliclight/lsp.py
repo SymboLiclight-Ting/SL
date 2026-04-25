@@ -7,11 +7,10 @@ from pathlib import Path
 from urllib.request import url2pathname
 from urllib.parse import unquote, urlparse
 
-from symboliclight.ast import App, FieldDecl, TypeDecl, Unit
+from symboliclight.ast import App, FieldDecl, StoreDecl, TypeDecl, TypeRef, Unit
 from symboliclight.checker import check_program_result
-from symboliclight.cli_support import contains_line_comment_source
 from symboliclight.diagnostics import Diagnostic, SourceLocation
-from symboliclight.formatter import format_unit
+from symboliclight.formatter import format_source
 from symboliclight.parser import parse_source_result
 
 
@@ -172,6 +171,22 @@ def infer_hover_type(unit: Unit, token: str, *, line: int | None = None) -> str 
         type_decl = find_type(unit, route.body_type.name)
         field = find_field(type_decl, field_name) if type_decl else None
         return field.type_ref.render() if field is not None else None
+    parts = token.split(".")
+    if len(parts) == 2:
+        config_type = config_field_type(unit, parts[0], parts[1])
+        if config_type is not None:
+            return config_type.render()
+        store_type = store_method_type(unit, parts[0], parts[1])
+        if store_type is not None:
+            return store_type.render()
+        enum_type = enum_variant_type(unit, parts[0], parts[1])
+        if enum_type is not None:
+            return enum_type
+    if len(parts) == 3 and parts[0] in unit.imported_modules:
+        imported = unit.imported_modules[parts[0]]
+        enum_type = enum_variant_type(imported, parts[1], parts[2])
+        if enum_type is not None:
+            return f"{parts[0]}.{enum_type}"
     for type_decl in unit.types:
         if token == type_decl.name:
             return "type"
@@ -188,6 +203,12 @@ def infer_hover_type(unit: Unit, token: str, *, line: int | None = None) -> str 
         for route in unit.routes:
             if token == route.function_name:
                 return route.return_type.render()
+        for store in unit.stores:
+            if token == store.name:
+                return f"store {store.type_ref.render()}"
+        for config in unit.configs:
+            if token == config.name:
+                return "config"
     return None
 
 
@@ -246,12 +267,10 @@ def definition_at(uri: str, text: str, line: int, character: int) -> dict[str, o
 
 
 def formatting_edits(uri: str, text: str) -> tuple[list[dict[str, object]] | None, str | None]:
-    if contains_line_comment_source(text):
-        return None, "SL formatter refuses to rewrite files with // comments in v0.5."
     result = parse_source_result(text, path=str(path_from_uri(uri)))
     if result.unit is None or any(item.severity == "error" for item in result.diagnostics):
         return None, "Fix parser errors before formatting."
-    formatted = format_unit(result.unit)
+    formatted = format_source(text, path=str(path_from_uri(uri)))
     if formatted == text:
         return [], None
     line_count = len(text.splitlines())
@@ -279,6 +298,17 @@ def local_definition(unit: Unit, token: str, uri: str) -> dict[str, object] | No
     if isinstance(unit, App):
         candidates.extend((item.name, item.location) for item in unit.stores)
         candidates.extend((item.name, item.location) for item in unit.configs)
+        candidates.extend((item.function_name, item.location) for item in unit.routes)
+        candidates.extend((f"{item.method} {item.path}", item.location) for item in unit.routes)
+    if "." in token:
+        parts = token.split(".")
+        if len(parts) == 2:
+            candidates.extend((f"{enum.name}.{variant}", enum.location) for enum in unit.enums for variant in enum.variants)
+            if isinstance(unit, App):
+                candidates.extend((f"{store.name}.{method}", store.location) for store in unit.stores for method in ("insert", "all", "get", "update", "try_update", "delete", "filter", "count", "exists", "clear"))
+                candidates.extend((f"{config.name}.{field.name}", config.location) for config in unit.configs for field in config.fields)
+        if len(parts) == 3:
+            candidates.extend((f"{alias}.{enum.name}.{variant}", enum.location) for alias, module in unit.imported_modules.items() for enum in module.enums for variant in enum.variants)
     match = next((location for name, location in candidates if name == token), None)
     if match is None:
         return None
@@ -286,13 +316,62 @@ def local_definition(unit: Unit, token: str, uri: str) -> dict[str, object] | No
 
 
 def find_type(unit: Unit, name: str) -> TypeDecl | None:
-    return next((item for item in unit.types if item.name == name), None)
+    local = next((item for item in unit.types if item.name == name), None)
+    if local is not None:
+        return local
+    if "." in name:
+        alias, type_name = name.split(".", 1)
+        module = unit.imported_modules.get(alias)
+        if module is not None:
+            return next((item for item in module.types if item.name == type_name), None)
+    return None
 
 
 def find_field(type_decl: TypeDecl | None, name: str) -> FieldDecl | None:
     if type_decl is None:
         return None
     return next((field for field in type_decl.fields if field.name == name), None)
+
+
+def config_field_type(unit: Unit, config_name: str, field_name: str) -> TypeRef | None:
+    if not isinstance(unit, App):
+        return None
+    config = next((item for item in unit.configs if item.name == config_name), None)
+    if config is None:
+        return None
+    field = next((item for item in config.fields if item.name == field_name), None)
+    return field.type_ref if field is not None else None
+
+
+def store_method_type(unit: Unit, store_name: str, method: str) -> TypeRef | None:
+    if not isinstance(unit, App):
+        return None
+    store = next((item for item in unit.stores if item.name == store_name), None)
+    if store is None:
+        return None
+    return store_helper_return_type(store, method)
+
+
+def store_helper_return_type(store: StoreDecl, method: str) -> TypeRef | None:
+    item_type = store.type_ref
+    if method in {"insert", "update"}:
+        return item_type
+    if method == "try_update" or method == "get":
+        return TypeRef("Option", [item_type])
+    if method == "all" or method == "filter":
+        return TypeRef("List", [item_type])
+    if method == "count" or method == "clear":
+        return TypeRef("Int")
+    if method in {"exists", "delete"}:
+        return TypeRef("Bool")
+    return None
+
+
+def enum_variant_type(unit: Unit, enum_name: str, variant: str) -> str | None:
+    enum_decl = next((item for item in unit.enums if item.name == enum_name), None)
+    if enum_decl is None or variant not in enum_decl.variants:
+        return None
+    return enum_name
 
 
 def route_at_line(unit: App, zero_based_line: int | None) -> object | None:

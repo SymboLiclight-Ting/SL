@@ -18,6 +18,7 @@ def test_release_check_dry_run_includes_gallery_and_core_checks() -> None:
     assert any("examples/gallery/small-admin-backend/app.sl" in command for command in commands)
     assert any("doctor examples/gallery/small-admin-backend/app.sl --db build/small-admin-backend.sqlite" in command for command in commands)
     assert any("scripts/doctor_drift_smoke.py" in command for command in commands)
+    assert any("scripts/compat_check.py" in command for command in commands)
     assert any("symboliclight.cli doctor" in command for command in commands)
     assert not any(command.endswith(" -m build") for command in commands)
     assert not any("scripts/package_smoke.py" in command for command in commands)

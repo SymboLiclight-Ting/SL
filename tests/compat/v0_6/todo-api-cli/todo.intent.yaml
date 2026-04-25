@@ -1,0 +1,47 @@
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /todos
+# sl: route POST /todos
+# sl: command add
+# sl: command list
+
+metadata:
+  name: "todo_app"
+  title: "Todo API and CLI"
+  owner: "symboliclight"
+
+task:
+  goal: "Build a local Todo application with CLI commands and JSON HTTP routes."
+  audience:
+    - "Application developer"
+  priority: "high"
+
+permissions:
+  web: true
+  filesystem:
+    read: true
+    write: true
+  network: false
+  tools:
+    create_file: true
+    delete_file: false
+    send_email: false
+    purchase: false
+
+constraints:
+  - "Use local SQLite storage only."
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 500
+  sections:
+    - "Build"
+    - "Run"
+    - "Test"
+
+tests:
+  - name: "All sections are present"
+    assert:
+      - type: "required_sections"

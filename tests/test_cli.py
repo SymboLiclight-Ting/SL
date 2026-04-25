@@ -502,6 +502,74 @@ app DriftDemo {
     assert "schema drift: up to date" in doctor
 
 
+def test_cli_doctor_json_reports_machine_readable_schema(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    text = """
+app DriftDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+    done: Bool,
+  }
+
+  store items: Item
+}
+"""
+    source.write_text(text, encoding="utf-8")
+    app = parse_source(text, path=str(source))
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)")
+        database.execute(
+            "INSERT INTO sl_migrations (version, schema_hash) VALUES (1, ?)",
+            [generate_schema_hash(app)],
+        )
+        database.execute('CREATE TABLE "items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT)')
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["doctor", str(source), "--db", str(db_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["unit"] == {"kind": "app", "name": "DriftDemo"}
+    assert payload["schema"]["drift"] == "structural_drift"
+    assert {"kind": "missing_column", "table": "items", "column": "done"} in payload["schema"]["diff"]
+
+
+def test_cli_doctor_json_reports_not_checked_without_db(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    source.write_text(
+        """
+app DoctorJson {
+  route GET "/ok" -> Text {
+    return "ok"
+  }
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["doctor", str(source), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["schema"]["drift"] == "not_checked"
+    assert payload["summary"]["routes"] == 1
+
+
+def test_cli_doctor_json_keeps_report_shape_on_parse_error(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "broken.sl"
+    source.write_text("app Broken { route GET", encoding="utf-8")
+
+    assert main(["doctor", str(source), "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["unit"] is None
+    assert payload["schema"]["drift"] == "not_checked"
+    assert payload["diagnostics"][0]["severity"] == "error"
+
+
 def test_cli_schema_includes_imported_enums(tmp_path: Path) -> None:
     source = ROOT / "examples" / "issue_tracker.sl"
     output = tmp_path / "issue_schema.json"
@@ -586,20 +654,33 @@ app Commented {
     assert source.read_text(encoding="utf-8") == original
 
 
-def test_cli_fmt_refuses_to_drop_comments(tmp_path: Path) -> None:
+def test_cli_fmt_preserves_comments(tmp_path: Path) -> None:
     source = tmp_path / "commented.sl"
     original = """
 // keep this intent note
 app Commented {
+  // keep this intent declaration note
+  intent "./commented.intent.yaml" // keep intent trailing note
+
+  // keep this route note
   route GET "/note" -> Text {
-    return "ok"
+    // keep this return note
+    return "ok" // keep trailing note
   }
 }
 """.lstrip()
     source.write_text(original, encoding="utf-8")
 
-    assert main(["fmt", str(source)]) == 1
-    assert source.read_text(encoding="utf-8") == original
+    assert main(["fmt", str(source)]) == 0
+    formatted = source.read_text(encoding="utf-8")
+
+    assert "// keep this intent note" in formatted
+    assert "// keep this intent declaration note" in formatted
+    assert 'intent "./commented.intent.yaml" // keep intent trailing note' in formatted
+    assert "// keep this route note" in formatted
+    assert "// keep this return note" in formatted
+    assert 'return "ok" // keep trailing note' in formatted
+    assert main(["fmt", str(source), "--check"]) == 0
 
 
 def test_cli_fmt_preserves_escaped_strings(tmp_path: Path) -> None:

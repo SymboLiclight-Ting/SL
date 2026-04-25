@@ -77,6 +77,38 @@ app Demo {
     assert "`request.body.shared: Int`" in json.dumps(hover)
 
 
+def test_lsp_hover_reports_store_config_enum_and_function_types(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    text = """
+app Demo {
+  enum Status { open, closed }
+  type Item = { id: Id<Item>, title: Text, }
+  config AppConfig = { port: Int = env_int("PORT", 8000), }
+  store items: Item
+  fn ok() -> Bool { return true }
+  route GET "/items" -> List<Item> {
+    let total = items.count()
+    let port = AppConfig.port
+    let status = Status.open
+    return items.all()
+  }
+}
+"""
+
+    def hover_for(fragment: str) -> str:
+        line = next(index for index, item in enumerate(text.splitlines()) if fragment in item)
+        character = text.splitlines()[line].index(fragment) + len(fragment) - 1
+        hover = hover_at(source.as_uri(), text, line, character)
+        assert hover is not None
+        return json.dumps(hover)
+
+    assert "`items.count: Int`" in hover_for("items.count")
+    assert "`items.all: List<Item>`" in hover_for("items.all")
+    assert "`AppConfig.port: Int`" in hover_for("AppConfig.port")
+    assert "`Status.open: Status`" in hover_for("Status.open")
+    assert "`ok: Bool`" in hover_for("ok")
+
+
 def test_lsp_document_symbols_cover_core_declarations(tmp_path: Path) -> None:
     source = tmp_path / "app.sl"
     text = """
@@ -118,19 +150,52 @@ app Demo {
     assert location["range"]["start"]["line"] == 0
 
 
-def test_lsp_formatting_refuses_comments(tmp_path: Path) -> None:
+def test_lsp_definition_resolves_store_helper_and_enum_variant(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    text = """
+app Demo {
+  enum Status { open, closed }
+  type Item = { id: Id<Item>, status: Status, }
+  store items: Item
+  route GET "/items" -> List<Item> {
+    let status = Status.open
+    return items.all()
+  }
+}
+"""
+
+    lines = text.splitlines()
+    store_line = next(index for index, item in enumerate(lines) if "items.all" in item)
+    enum_line = next(index for index, item in enumerate(lines) if "Status.open" in item)
+
+    store_location = definition_at(source.as_uri(), text, store_line, lines[store_line].index("all"))
+    enum_location = definition_at(source.as_uri(), text, enum_line, lines[enum_line].index("open"))
+
+    assert store_location is not None
+    assert store_location["range"]["start"]["line"] == 4
+    assert enum_location is not None
+    assert enum_location["range"]["start"]["line"] == 2
+
+
+def test_lsp_formatting_preserves_comments(tmp_path: Path) -> None:
     source = tmp_path / "app.sl"
     text = """
 // keep this
 app Demo {
+  // keep test
+  test "ok" {
+    assert true // trailing
+  }
 }
 """.lstrip()
 
     edits, error = formatting_edits(source.as_uri(), text)
 
-    assert edits is None
-    assert error is not None
-    assert "comments" in error
+    assert error is None
+    formatted = edits[0]["newText"] if edits else text
+    assert "// keep this" in formatted
+    assert "// keep test" in formatted
+    assert "assert true // trailing" in formatted
 
 
 def test_lsp_path_from_uri_preserves_posix_absolute_path() -> None:

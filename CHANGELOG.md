@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.0rc1
+
+- Added comment-preserving formatting for common `//` comment positions.
+- Added `slc doctor --json` for machine-readable doctor output.
+- Extended LSP hover, definition, document symbols, and formatting coverage.
+- Added compatibility fixtures for representative v0.6, v0.7, and v0.8 applications.
+- Added a Markdown documentation site skeleton under `docs/site/`.
+- Updated release smoke checks to include compatibility fixtures.
+
 ## v0.8.0
 
 - Added read-only summary schema diff output to `slc doctor --db`.

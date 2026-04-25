@@ -1,6 +1,6 @@
-# SymbolicLight v0.8 Semantics
+# SymbolicLight v0.9 Semantics
 
-SymbolicLight v0.8 is an application language that compiles to Python.
+SymbolicLight v0.9 is an application language that compiles to Python.
 
 ## Unit Boundary
 
@@ -61,9 +61,9 @@ Supported store methods:
 
 `count()` returns the number of rows in a store. `exists(id)` checks whether an item exists. `clear()` deletes all rows and is allowed only in `test` blocks.
 
-Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.8 does not automatically migrate data and does not replace the stored hash on drift. A matching hash is metadata evidence only; it is not a substitute for structural inspection.
+Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.9 does not automatically migrate data and does not replace the stored hash on drift. A matching hash is metadata evidence only; it is not a substitute for structural inspection.
 
-`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only. It separates hash state from table structure: `schema drift: up to date` means the hash matches, `schema diff: no structural difference detected` means table structure matches, `schema drift: structural drift detected` means the hash matches but the actual schema differs, and `schema drift: drift detected` means the stored hash differs from the generated hash. Drift reports include summary schema differences and a manual migration suggestion; v0.8 never modifies application data.
+`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only. It separates hash state from table structure: `schema drift: up to date` means the hash matches, `schema diff: no structural difference detected` means table structure matches, `schema drift: structural drift detected` means the hash matches but the actual schema differs, and `schema drift: drift detected` means the stored hash differs from the generated hash. Drift reports include summary schema differences and a manual migration suggestion; v0.9 never modifies application data.
 
 ## Request Body Semantics
 
@@ -146,13 +146,15 @@ Compiler diagnostics carry a stable shape for tools and AI repair loops:
 
 ## Formatting Boundary
 
-The v0.5 formatter is the official style source for comment-free `.sl` files.
+The v0.9 formatter is the official style source for `.sl` files.
 
-Files containing `//` comments are not rewritten in v0.5. The formatter exits with an error instead of deleting comments, because comment-preserving formatting requires lexer trivia support.
+Files containing `//` comments are rewritten only when comments can be preserved in stable trivia positions. v0.9 supports file header comments, comments before top-level items, comments before statements, and trailing comments. Formatting is intended to be idempotent.
 
 ## Developer Preview Tooling
 
 `slc lsp` exposes compiler diagnostics and basic source navigation through JSON-RPC over stdio. The LSP does not change language semantics; it reuses the parser, checker, and formatter.
+
+`slc doctor --json` is the machine-readable doctor interface. Its schema separates compiler diagnostics, IntentSpec alignment, schema drift, schema diff, cache status, and source-map status so external tools can consume the same checks without parsing human text output.
 
 The local playground compiles submitted `.sl` source to Python or diagnostics JSON. It is a preview tool and not a production runtime.
 

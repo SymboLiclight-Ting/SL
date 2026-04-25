@@ -13,10 +13,10 @@ from symboliclight.cache import read_check_cache, write_check_cache
 from symboliclight.checker import check_program_result
 from symboliclight.codegen import generate_python, generate_python_artifact, generate_schema_hash
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError, raise_if_errors
-from symboliclight.formatter import format_unit
+from symboliclight.formatter import format_source
 from symboliclight.intent import IntentContract, load_intent_contract
 from symboliclight.lsp import run_lsp_server
-from symboliclight.parser import parse_source, parse_source_result
+from symboliclight.parser import parse_source_result
 from symboliclight.schema import generate_schema
 from symboliclight.cli_support import contains_line_comment_source
 
@@ -57,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.add_argument("source")
     doctor_parser.add_argument("--strict-intent", action="store_true")
     doctor_parser.add_argument("--db")
+    doctor_parser.add_argument("--json", action="store_true")
 
     sub.add_parser("lsp")
 
@@ -154,8 +155,22 @@ def main(argv: list[str] | None = None) -> int:
             return format_file(Path(args.source), check_only=args.check)
         if args.command == "doctor":
             unit, diagnostics, cache_hit = load_checked_unit(Path(args.source), strict_intent=args.strict_intent)
-            print_diagnostics(diagnostics)
-            print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit, db_path=Path(args.db) if args.db else None))
+            if args.json:
+                print(
+                    json.dumps(
+                        doctor_report_json(
+                            unit,
+                            diagnostics,
+                            Path(args.source),
+                            cache_hit=cache_hit,
+                            db_path=Path(args.db) if args.db else None,
+                        ),
+                        indent=2,
+                    )
+                )
+            else:
+                print_diagnostics(diagnostics)
+                print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit, db_path=Path(args.db) if args.db else None))
             return 1 if any(diagnostic.severity == "error" for diagnostic in diagnostics) else 0
         if args.command == "lsp":
             run_lsp_server()
@@ -174,6 +189,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"added route {args.method.upper()} {args.path} to {source}")
             return 0
     except SymbolicLightError as exc:
+        if getattr(args, "command", None) == "doctor" and getattr(args, "json", False):
+            print(
+                json.dumps(
+                    doctor_error_report_json(Path(args.source), exc.diagnostics),
+                    indent=2,
+                )
+            )
+            return 1
         print_diagnostics(exc.diagnostics, json_output=getattr(args, "json", False))
         return 1
     except OSError as exc:
@@ -231,13 +254,7 @@ def load_checked_unit(
 
 def format_file(source_path: Path, *, check_only: bool) -> int:
     source = source_path.read_text(encoding="utf-8")
-    if contains_line_comment(source):
-        print(
-            f"{source_path}: cannot format files with // comments without dropping comments",
-            file=sys.stderr,
-        )
-        return 1
-    formatted = format_unit(parse_source(source, path=str(source_path)))
+    formatted = format_source(source, path=str(source_path))
     if check_only:
         if formatted != source:
             print(f"{source_path}: needs formatting", file=sys.stderr)
@@ -307,9 +324,91 @@ def doctor_report(
     return "\n".join(lines)
 
 
+def doctor_report_json(
+    unit: Unit,
+    diagnostics: list[Diagnostic],
+    source_path: Path,
+    *,
+    cache_hit: bool,
+    db_path: Path | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "source": str(source_path),
+        "unit": {"kind": "app" if isinstance(unit, App) else "module", "name": unit.name},
+        "diagnostics": [diagnostic.to_dict() for diagnostic in diagnostics],
+        "cache": {"hit": cache_hit},
+        "source_map": {"generated_by_default": True},
+    }
+    if isinstance(unit, App):
+        payload["summary"] = {
+            "intents": len(unit.intents),
+            "imports": len(unit.imports),
+            "stores": len(unit.stores),
+            "commands": len([fn for fn in unit.functions if fn.kind == "command"]),
+            "routes": len(unit.routes),
+            "route_bodies_typed": len([route for route in unit.routes if route.body_type is not None]),
+        }
+        payload["schema"] = (
+            {"drift": "not_checked", "database": None, "diff": []}
+            if db_path is None
+            else schema_drift_info(unit, db_path)
+        )
+        payload["intent"] = intent_doctor_json(unit, source_path)
+    else:
+        payload["summary"] = {
+            "imports": len(unit.imports),
+            "types": len(unit.types),
+            "enums": len(unit.enums),
+        }
+        payload["schema"] = {"drift": "not_checked", "database": None, "diff": []}
+        payload["intent"] = {"declared": False, "contracts": []}
+    return payload
+
+
+def doctor_error_report_json(source_path: Path, diagnostics: list[Diagnostic]) -> dict[str, object]:
+    return {
+        "source": str(source_path),
+        "unit": None,
+        "diagnostics": [diagnostic.to_dict() for diagnostic in diagnostics],
+        "summary": {},
+        "intent": {"declared": False, "contracts": []},
+        "schema": {"drift": "not_checked", "database": None, "diff": []},
+        "cache": {"hit": False},
+        "source_map": {"generated_by_default": True},
+    }
+
+
 def schema_drift_lines(app: App, db_path: Path) -> list[str]:
-    if not db_path.exists():
+    info = schema_drift_info(app, db_path)
+    drift = str(info["drift"])
+    if drift == "not_initialized":
         return [f"- schema drift: not initialized ({db_path})"]
+    if drift == "up_to_date":
+        return [
+            f"- schema drift: up to date ({db_path})",
+            "- schema diff: no structural difference detected",
+        ]
+    if drift == "structural_drift":
+        return [
+            f"- schema drift: structural drift detected ({db_path})",
+            *[render_schema_diff_item(item) for item in info["diff"] if isinstance(item, dict)],
+            "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
+        ]
+    if drift == "hash_drift":
+        return [
+            f"- schema drift: drift detected ({db_path})",
+            *[render_schema_diff_item(item) for item in info["diff"] if isinstance(item, dict)],
+            "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
+        ]
+    return [
+        f"- schema drift: unable to inspect ({db_path})",
+        f"- schema drift error: {info.get('error', '')}",
+    ]
+
+
+def schema_drift_info(app: App, db_path: Path) -> dict[str, object]:
+    if not db_path.exists():
+        return {"drift": "not_initialized", "database": str(db_path), "diff": []}
     try:
         database = sqlite3.connect(db_path)
         database.row_factory = sqlite3.Row
@@ -318,69 +417,82 @@ def schema_drift_lines(app: App, db_path: Path) -> list[str]:
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sl_migrations'"
             ).fetchone()
             if table is None:
-                return [f"- schema drift: not initialized ({db_path})"]
+                return {"drift": "not_initialized", "database": str(db_path), "diff": []}
             row = database.execute(
                 "SELECT schema_hash FROM sl_migrations WHERE version = ?",
                 [1],
             ).fetchone()
             if row is None:
-                return [f"- schema drift: not initialized ({db_path})"]
+                return {"drift": "not_initialized", "database": str(db_path), "diff": []}
             expected = generate_schema_hash(app)
             actual = str(row["schema_hash"])
-            diff_lines = schema_diff_lines(app, database)
-            if actual == expected and not diff_lines:
-                return [
-                    f"- schema drift: up to date ({db_path})",
-                    "- schema diff: no structural difference detected",
-                ]
+            diff = schema_diff_items(app, database)
+            if actual == expected and not diff:
+                return {"drift": "up_to_date", "database": str(db_path), "diff": [], "expected_hash": expected, "actual_hash": actual}
             if actual == expected:
-                return [
-                    f"- schema drift: structural drift detected ({db_path})",
-                    *diff_lines,
-                    "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
-                ]
-            return [
-                f"- schema drift: drift detected ({db_path})",
-                *diff_lines,
-                "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
-            ]
+                return {"drift": "structural_drift", "database": str(db_path), "diff": diff, "expected_hash": expected, "actual_hash": actual}
+            return {"drift": "hash_drift", "database": str(db_path), "diff": diff, "expected_hash": expected, "actual_hash": actual}
         finally:
             database.close()
     except sqlite3.Error as exc:
-        return [
-            f"- schema drift: unable to inspect ({db_path})",
-            f"- schema drift error: {exc}",
-        ]
+        return {"drift": "unable_to_inspect", "database": str(db_path), "diff": [], "error": str(exc)}
 
 
 def schema_diff_lines(app: App, database: sqlite3.Connection) -> list[str]:
+    return [render_schema_diff_item(item) for item in schema_diff_items(app, database)]
+
+
+def schema_diff_items(app: App, database: sqlite3.Connection) -> list[dict[str, object]]:
     expected_tables = {
         store.name: expected_columns_for_store(app, store.type_ref)
         for store in app.stores
     }
     actual_tables = actual_schema(database)
     ignored_tables = {"sl_migrations", "sqlite_sequence"}
-    lines: list[str] = []
+    items: list[dict[str, object]] = []
     for table_name in sorted(expected_tables):
         expected_columns = expected_tables[table_name]
         actual_columns = actual_tables.get(table_name)
         if actual_columns is None:
-            lines.append(f"- schema diff: missing table {table_name}")
+            items.append({"kind": "missing_table", "table": table_name})
             continue
         for column_name in sorted(expected_columns):
             expected_type = expected_columns[column_name]
             actual_type = actual_columns.get(column_name)
             if actual_type is None:
-                lines.append(f"- schema diff: missing column {table_name}.{column_name}")
+                items.append({"kind": "missing_column", "table": table_name, "column": column_name})
             elif normalize_sqlite_type(actual_type) != normalize_sqlite_type(expected_type):
-                lines.append(
-                    f"- schema diff: type mismatch {table_name}.{column_name} expected {expected_type} found {actual_type}"
+                items.append(
+                    {
+                        "kind": "type_mismatch",
+                        "table": table_name,
+                        "column": column_name,
+                        "expected": expected_type,
+                        "actual": actual_type,
+                    }
                 )
         for column_name in sorted(set(actual_columns) - set(expected_columns)):
-            lines.append(f"- schema diff: extra column {table_name}.{column_name}")
+            items.append({"kind": "extra_column", "table": table_name, "column": column_name})
     for table_name in sorted(set(actual_tables) - set(expected_tables) - ignored_tables):
-        lines.append(f"- schema diff: extra table {table_name}")
-    return lines
+        items.append({"kind": "extra_table", "table": table_name})
+    return items
+
+
+def render_schema_diff_item(item: dict[str, object]) -> str:
+    kind = item.get("kind")
+    table = item.get("table")
+    column = item.get("column")
+    if kind == "missing_table":
+        return f"- schema diff: missing table {table}"
+    if kind == "extra_table":
+        return f"- schema diff: extra table {table}"
+    if kind == "missing_column":
+        return f"- schema diff: missing column {table}.{column}"
+    if kind == "extra_column":
+        return f"- schema diff: extra column {table}.{column}"
+    if kind == "type_mismatch":
+        return f"- schema diff: type mismatch {table}.{column} expected {item.get('expected')} found {item.get('actual')}"
+    return "- schema diff: unknown"
 
 
 def expected_columns_for_store(app: App, type_ref: TypeRef) -> dict[str, str]:
@@ -472,6 +584,44 @@ def intent_doctor_lines(app: App, contract: IntentContract) -> list[str]:
     elif app.intents and not contract.acceptance_tests:
         lines.append("- intent acceptance gap: contract has no tests")
     return lines
+
+
+def intent_doctor_json(app: App, source_path: Path) -> dict[str, object]:
+    contracts: list[dict[str, object]] = []
+    for intent_path in app.intents:
+        contract_path = (source_path.parent / intent_path).resolve()
+        if not contract_path.exists():
+            contracts.append({"path": intent_path, "exists": False})
+            continue
+        contract = load_intent_contract(contract_path)
+        app_routes, intent_routes, missing_routes, extra_routes = route_alignment(app, contract)
+        app_commands, intent_commands, missing_commands, extra_commands = command_alignment(app, contract)
+        contracts.append(
+            {
+                "path": str(contract_path),
+                "exists": True,
+                "routes": {
+                    "matched": len(app_routes & intent_routes),
+                    "declared": len(intent_routes),
+                    "missing": [{"method": method, "path": path} for method, path in missing_routes],
+                    "extra": [{"method": method, "path": path} for method, path in extra_routes],
+                },
+                "commands": {
+                    "matched": len(app_commands & intent_commands),
+                    "declared": len(intent_commands),
+                    "missing": missing_commands,
+                    "extra": extra_commands,
+                },
+                "permissions": permission_mismatch_lines(app, contract),
+                "acceptance_tests": len(contract.acceptance_tests),
+            }
+        )
+    return {
+        "declared": bool(app.intents),
+        "acceptance_declared": any(test.external_ref == "intent.acceptance" for test in app.tests),
+        "permissions_imported": bool(app.permissions_from),
+        "contracts": contracts,
+    }
 
 
 def route_alignment(app: App, contract: IntentContract) -> tuple[set[tuple[str, str]], set[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:

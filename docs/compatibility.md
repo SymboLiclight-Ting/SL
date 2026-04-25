@@ -114,3 +114,13 @@ v0.8 continues real-app hardening without broad syntax expansion:
 - `response_ok` and `response_err` are additive built-ins; `response(...)` behavior is unchanged,
 - `slc doctor --db` adds read-only summary schema diff lines and still never mutates application databases,
 - the Small Admin Backend gallery now demonstrates an explicit auth helper and `ErrorBody` response pattern.
+
+## v0.9 Notes
+
+v0.9 stabilizes developer experience without changing `.sl` core syntax:
+
+- `slc fmt` now preserves common `//` comment trivia instead of refusing commented files,
+- `slc doctor --json` adds a machine-readable doctor report while preserving text output,
+- LSP hover, definition, document symbols, and formatting are broader but remain developer-preview surfaces,
+- compatibility fixtures under `tests/compat/` preserve representative v0.6, v0.7, and v0.8 example behavior,
+- docs site Markdown files under `docs/site/` are documentation source material and do not introduce a site generator commitment.
