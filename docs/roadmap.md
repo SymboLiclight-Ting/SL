@@ -177,7 +177,7 @@ Deferred from v0.11:
 
 ## v0.12 Beta
 
-In progress:
+Implemented:
 
 - Windows, macOS, and Linux CI,
 - Python 3.11 and 3.12 validation,
@@ -196,6 +196,17 @@ Deferred from v0.12:
 - package registry,
 - automatic migrations,
 - production-grade HTTP hosting.
+
+## v0.13 Release Candidate Direction
+
+Next work:
+
+- syntax freeze candidate review,
+- standard API freeze candidate review,
+- migration and compatibility guide drafting,
+- stricter docs and example consistency checks,
+- final v1.0 blocker list,
+- public release readiness review.
 
 ## v1.0 Stable
 
