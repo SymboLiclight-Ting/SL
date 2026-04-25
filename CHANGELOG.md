@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.0rc2
+
+- Aligned the release candidate package version with the `v0.9.0-rc2` tag.
+- Polished v0.9 review diagnostics so release-facing messages no longer mention older v0.8 wording.
+- Updated the full development plan to mark v0.9 DX Stabilization as complete and v0.10 as the next stage.
+
 ## v0.9.0rc1
 
 - Added comment-preserving formatting for common `//` comment positions.

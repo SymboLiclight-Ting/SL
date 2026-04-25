@@ -190,7 +190,7 @@ python scripts/package_smoke.py --gallery
 python scripts/release_check.py
 ```
 
-For a local `v0.9.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
+For a local `v0.9.0-rc2` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
 
 ## Project Status
 

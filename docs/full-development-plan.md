@@ -8,12 +8,12 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.9.0-rc1` 本地发布候选，另有 post-RC review polish 提交。
-- 当前实现基线：`12b1aeb Polish v0.9 review diagnostics`，本规划文档更新提交位于其后。
-- 当前 tag：`v0.9.0-rc1`，仍指向 `3e9c196 Implement v0.9 DX stabilization`，未移动。
+- 当前版本状态：`v0.9.0-rc2` 本地发布候选准备中。
+- 当前实现基线：`def530f Update development plan for v0.9 status`，后续 release version bump 位于其后。
+- 当前 tag：`v0.9.0-rc1` 仍指向 `3e9c196 Implement v0.9 DX stabilization`，未移动；`v0.9.0-rc2` 应指向当前 release bump 提交。
 - 当前工作树：干净。
-- 发布状态：已完成本地 release check 和 post-RC review 收口，未上传 TestPyPI 或 PyPI。
-- 下一 release 动作：如果继续发布候选，应从当前 HEAD 打 `v0.9.0-rc2`，不要移动已有 `v0.9.0-rc1`。
+- 发布状态：已完成 post-RC review 收口，准备从 `v0.9.0-rc2` 重新执行 fresh release 演练，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：从 `v0.9.0-rc2` fresh checkout 运行 `python scripts\release_check.py`。
 
 按“成熟语言 100%”口径估算：
 
@@ -326,7 +326,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 42% 到 50%：v0.9 DX Stabilization
 
-状态：当前已完成到 `v0.9.0-rc1`，并有 post-RC review polish 提交。
+状态：当前已完成到 `v0.9.0-rc2` 准备点。
 
 核心目标：
 
@@ -348,9 +348,9 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 - `schema.drift` 稳定枚举：`not_checked`、`not_initialized`、`up_to_date`、`structural_drift`、`hash_drift`、`unable_to_inspect`。
 - v0.6、v0.7、v0.8 compatibility fixtures。
 - `docs/site/` Markdown 文档站骨架。
-- `pyproject.toml` 升级到 `0.9.0rc1`。
-- 本地 tag `v0.9.0-rc1`。
-- post-RC review polish，移除 release-facing 诊断中的旧版本字样。
+- `pyproject.toml` 升级到 `0.9.0rc2`。
+- 本地 tag `v0.9.0-rc1` 和 `v0.9.0-rc2`。
+- review polish，移除 release-facing 诊断中的旧版本字样。
 
 已验证：
 
@@ -395,8 +395,8 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 发布状态：
 
 - `v0.9.0-rc1` 已存在，不应移动。
-- 当前 HEAD 在 `v0.9.0-rc1` 之后包含 `12b1aeb Polish v0.9 review diagnostics`。
-- 如果要继续 release candidate，应打 `v0.9.0-rc2`，并从该 tag 重新跑 fresh release 演练。
+- `v0.9.0-rc2` 应指向包含 `0.9.0rc2` package version 的 release bump 提交。
+- 每次 release candidate 都应从对应 tag 重新跑 fresh release 演练。
 
 ## 50% 到 60%：v0.10 Production App Kit
 
@@ -686,11 +686,11 @@ v1.0 兼容承诺：
 
 ## 下一步推荐
 
-最推荐的下一阶段是 v0.10 Production App Kit，但在进入 v0.10 前应先决定是否打 `v0.9.0-rc2`。
+最推荐的下一阶段是 v0.10 Production App Kit，但在进入 v0.10 前应先完成 `v0.9.0-rc2` fresh release 演练。
 
 优先级：
 
-1. 如需发布候选，从当前 HEAD 打 `v0.9.0-rc2`，重新执行 fresh tag release 演练。
+1. 从 `v0.9.0-rc2` 重新执行 fresh tag release 演练。
 2. v0.10 开始前，冻结 v0.9 的 compatibility fixtures，作为后续回归基线。
 3. 设计 migration plan 输出，不自动改数据库。
 4. 设计 Postgres 最小集成边界，避免把 SL 变成大而全 ORM。
