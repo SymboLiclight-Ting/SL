@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.10 developer preview supports:
+The v0.11 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -53,6 +53,8 @@ The v0.10 developer preview supports:
 - optional Postgres runtime support through `symboliclight[postgres]`.
 - comment-preserving formatting for common `//` comment positions.
 - repeatable release smoke checks through `scripts/release_check.py`.
+- starter API templates through `slc new api --template`.
+- docs, VS Code, and release notes maintenance checks.
 
 ## Quick Start
 
@@ -69,6 +71,8 @@ slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite
 slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite --json
 slc migrate plan examples/gallery/project-ops-api/app.sl --db build/project_ops.sqlite
 slc check examples/gallery/project-ops-api/app_postgres.sl
+slc new api my-api --template todo --backend sqlite
+slc new api ops-api --template project-ops --backend postgres
 slc lsp
 python build/todo_app.py test
 python build/todo_app.py add "Buy milk"
@@ -77,6 +81,17 @@ python build/todo_app.py serve
 ```
 
 SQLite generated apps use only the Python standard library: `argparse`, `sqlite3`, `http.server`, and `json`. Postgres generated apps require installing `symboliclight[postgres]`.
+
+## 10-minute Trial Path
+
+```bash
+slc check examples/todo_app.sl
+slc build examples/todo_app.sl --out build/todo_app.py
+python build/todo_app.py test
+python build/todo_app.py add "Buy milk"
+slc new api my-api --template todo --backend sqlite
+slc check my-api/src/app.sl
+```
 
 ## Example
 
@@ -179,6 +194,9 @@ slc doctor <file.sl>
 slc doctor <file.sl> --json
 slc doctor <file.sl> --db path/to/app.sqlite
 slc doctor <file.sl> --db path/to/app.sqlite --json
+slc migrate plan <file.sl> --db path-or-url
+slc new api <name> --template todo --backend sqlite
+slc new api <name> --template project-ops --backend postgres
 slc lsp
 slc init <dir>
 slc new api <name>
@@ -189,12 +207,15 @@ slc add route GET /items <file.sl>
 
 ```bash
 python scripts/release_check.py --skip-package
+python scripts/docs_check.py
+python scripts/vscode_check.py
 python -m build
 python scripts/package_smoke.py --gallery
+python scripts/release_notes.py --from v0.10.0-rc1 --to HEAD --out build/release-notes.md
 python scripts/release_check.py
 ```
 
-For a local `v0.10.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
+For a local `v0.11.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
 
 ## Project Status
 

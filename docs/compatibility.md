@@ -135,3 +135,13 @@ v0.10 adds production app kit surfaces while preserving existing SQLite apps:
 - `slc migrate plan` is additive and read-only,
 - migration planning and `doctor --db` do not execute SQL changes and do not mutate user databases,
 - `project-ops-api` is an additive gallery example for production-app-kit validation.
+
+## v0.11 Notes
+
+v0.11 is an ecosystem preview and does not add core `.sl` syntax:
+
+- `slc new api <name>` keeps its existing default behavior,
+- `slc new api --template ... --backend ...` is additive,
+- `postgres` template generation is limited to the Project Ops starter,
+- docs, VS Code, release notes, and GitHub metadata are project assets, not v1.0 compatibility commitments,
+- v0.10 Project Ops is frozen as a compatibility fixture.

@@ -9,6 +9,10 @@ Start with:
 - [Quickstart](quickstart.md)
 - [Language Tour](language-tour.md)
 - [App Kit](app-kit.md)
+- [Database](database.md)
+- [IntentSpec](intentspec.md)
+- [Testing](testing.md)
 - [Tooling](tooling.md)
+- [Error Handling](error-handling.md)
+- [AI-assisted Development](ai-assisted-development.md)
 - [Roadmap](roadmap.md)
-

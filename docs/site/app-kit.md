@@ -38,3 +38,12 @@ config AppConfig = {
   port: Int = env_int("PORT", 8000),
 }
 ```
+
+Starter apps:
+
+```bash
+slc new api todo-demo --template todo --backend sqlite
+slc new api notes-demo --template notes --backend sqlite
+slc new api admin-demo --template admin --backend sqlite
+slc new api ops-demo --template project-ops --backend postgres
+```

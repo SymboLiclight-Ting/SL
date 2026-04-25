@@ -10,10 +10,11 @@ Current focus:
 
 Near-term candidates:
 
-- hosted documentation,
-- package publishing rehearsal when the project owner is ready,
+- ecosystem preview documentation,
+- starter templates for common app shapes,
 - compatibility fixtures for v0.10 Project Ops API,
-- richer LSP navigation and refactoring.
+- local contribution and release process,
+- local VS Code extension validation.
 
 Long-term goal:
 

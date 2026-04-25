@@ -75,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
     new_sub = new_parser.add_subparsers(dest="new_kind", required=True)
     new_api = new_sub.add_parser("api")
     new_api.add_argument("name")
+    new_api.add_argument("--template", choices=["todo", "notes", "admin", "project-ops"], default="todo")
+    new_api.add_argument("--backend", choices=["sqlite", "postgres"], default="sqlite")
 
     add_parser = sub.add_parser("add")
     add_sub = add_parser.add_subparsers(dest="add_kind", required=True)
@@ -199,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"initialized {args.directory}")
             return 0
         if args.command == "new" and args.new_kind == "api":
-            new_api_project(args.name, Path.cwd())
+            new_api_project(args.name, Path.cwd(), template=args.template, backend=args.backend)
             print(f"created {args.name}")
             return 0
         if args.command == "add" and args.add_kind == "route":
@@ -1020,7 +1022,9 @@ def init_project(directory: Path) -> None:
     write_new_file(gitignore, ".slcache/\nbuild/\n*.sqlite\n__pycache__/\n")
 
 
-def new_api_project(name: str, directory: Path) -> None:
+def new_api_project(name: str, directory: Path, *, template: str = "todo", backend: str = "sqlite") -> None:
+    if backend == "postgres" and template != "project-ops":
+        raise OSError("Postgres backend is only available for the project-ops template in v0.11.")
     app_name = name.replace("-", "_").replace(" ", "_").title().replace("_", "")
     project = directory / name
     project.mkdir(parents=True, exist_ok=True)
@@ -1032,9 +1036,9 @@ def new_api_project(name: str, directory: Path) -> None:
     intent = intent_dir / f"{name}.intent.yaml"
     readme = project / "README.md"
     gitignore = project / ".gitignore"
-    write_new_file(source, sample_app(app_name, f"../intent/{name}.intent.yaml"))
-    write_new_file(intent, sample_intent(app_name))
-    write_new_file(readme, f"# {app_name}\n\nRun `slc check src/app.sl`.\n")
+    write_new_file(source, sample_app_template(app_name, f"../intent/{name}.intent.yaml", template=template, backend=backend))
+    write_new_file(intent, sample_intent_template(app_name, template=template))
+    write_new_file(readme, sample_project_readme(app_name, template=template, backend=backend))
     write_new_file(gitignore, ".slcache/\nbuild/\n*.sqlite\n__pycache__/\n")
 
 
@@ -1096,6 +1100,176 @@ def sample_app(app_name: str, intent_path: str) -> str:
 '''
 
 
+def sample_app_template(app_name: str, intent_path: str, *, template: str, backend: str) -> str:
+    if template == "todo":
+        return sample_app(app_name, intent_path)
+    if template == "notes":
+        return sample_notes_app(app_name, intent_path)
+    if template == "admin":
+        return sample_admin_app(app_name, intent_path)
+    if template == "project-ops":
+        return sample_project_ops_app(app_name, intent_path, backend=backend)
+    raise OSError(f"Unknown template: {template}")
+
+
+def sample_notes_app(app_name: str, intent_path: str) -> str:
+    return f'''app {app_name} {{
+  intent "{intent_path}"
+
+  type Note = {{
+    id: Id<Note>,
+    title: Text,
+    body: Text,
+  }}
+
+  type CreateNote = {{
+    title: Text,
+    body: Text,
+  }}
+
+  store notes: Note using sqlite
+
+  command add_note(title: Text, body: Text) -> Note {{
+    return notes.insert({{ title: title, body: body }})
+  }}
+
+  route GET "/notes" -> List<Note> {{
+    return notes.all()
+  }}
+
+  route POST "/notes" body CreateNote -> Note {{
+    return notes.insert({{ title: request.body.title, body: request.body.body }})
+  }}
+
+  test "add creates note" {{
+    let note = add_note("Hello", "World")
+    assert note.title == "Hello"
+  }}
+}}
+'''
+
+
+def sample_admin_app(app_name: str, intent_path: str) -> str:
+    return f'''app {app_name} {{
+  intent "{intent_path}"
+
+  enum Role {{ admin, viewer }}
+
+  type AdminUser = {{
+    id: Id<AdminUser>,
+    email: Text,
+    role: Role,
+    disabled: Bool,
+  }}
+
+  type CreateAdmin = {{
+    email: Text,
+    role: Role,
+  }}
+
+  config AppConfig = {{
+    admin_token: Text = env("ADMIN_TOKEN", "dev-token"),
+  }}
+
+  store users: AdminUser using sqlite
+
+  fn is_authorized(token: Option<Text>) -> Bool {{
+    return token == some(AppConfig.admin_token)
+  }}
+
+  command create_admin(email: Text, role: Role) -> AdminUser {{
+    return users.insert({{ email: email, role: role, disabled: false }})
+  }}
+
+  route GET "/users" -> List<AdminUser> {{
+    return users.all()
+  }}
+
+  route POST "/users" body CreateAdmin -> AdminUser {{
+    return users.insert({{ email: request.body.email, role: request.body.role, disabled: false }})
+  }}
+
+  test "create admin" {{
+    let user = create_admin("admin@example.com", Role.admin)
+    assert user.disabled == false
+  }}
+}}
+'''
+
+
+def sample_project_ops_app(app_name: str, intent_path: str, *, backend: str) -> str:
+    store_backend = backend
+    db_config = (
+        'db_url: Text = env("SL_DB_URL", "postgresql://localhost/symboliclight"),'
+        if backend == "postgres"
+        else 'db_path: Text = env("SL_DB", "symboliclight.sqlite"),'
+    )
+    return f'''app {app_name} {{
+  intent "{intent_path}"
+
+  enum TaskStatus {{ open, done }}
+
+  type Project = {{
+    id: Id<Project>,
+    name: Text,
+    archived: Bool,
+  }}
+
+  type Task = {{
+    id: Id<Task>,
+    project_id: Id<Project>,
+    title: Text,
+    status: TaskStatus,
+  }}
+
+  type CreateProject = {{
+    name: Text,
+  }}
+
+  type CreateTask = {{
+    project_id: Id<Project>,
+    title: Text,
+  }}
+
+  config AppConfig = {{
+    {db_config}
+  }}
+
+  store projects: Project using {store_backend}
+  store tasks: Task using {store_backend}
+
+  command create_project(name: Text) -> Project {{
+    return projects.insert({{ name: name, archived: false }})
+  }}
+
+  command create_task(project_id: Id<Project>, title: Text) -> Task {{
+    return tasks.insert({{ project_id: project_id, title: title, status: TaskStatus.open }})
+  }}
+
+  route GET "/projects" -> List<Project> {{
+    return projects.all()
+  }}
+
+  route POST "/projects" body CreateProject -> Project {{
+    return projects.insert({{ name: request.body.name, archived: false }})
+  }}
+
+  route GET "/tasks" -> List<Task> {{
+    return tasks.all()
+  }}
+
+  route POST "/tasks" body CreateTask -> Task {{
+    return tasks.insert({{ project_id: request.body.project_id, title: request.body.title, status: TaskStatus.open }})
+  }}
+
+  test "create project" {{
+    let project = create_project("Launch")
+    assert project.archived == false
+  }}
+}}
+'''
+
+
 def sample_intent(app_name: str) -> str:
     return f"""version: "0.1"
 kind: "IntentSpec"
@@ -1140,6 +1314,31 @@ tests:
     assert:
       - type: "required_sections"
 """
+
+
+def sample_intent_template(app_name: str, *, template: str) -> str:
+    intent = sample_intent(app_name)
+    if template == "notes":
+        return intent.replace("Generated app smoke test", "Notes smoke test")
+    if template == "admin":
+        return intent.replace("Generated app smoke test", "Admin smoke test")
+    if template == "project-ops":
+        return intent.replace("Generated app smoke test", "Project ops smoke test")
+    return intent
+
+
+def sample_project_readme(app_name: str, *, template: str, backend: str) -> str:
+    lines = [
+        f"# {app_name}",
+        "",
+        "Run `slc check src/app.sl`.",
+        "Run `slc test src/app.sl`.",
+        "Run `slc schema src/app.sl --out build/schema.json`.",
+    ]
+    if template == "project-ops" and backend == "postgres":
+        lines.append("Run `slc migrate plan src/app.sl --db postgresql://localhost/symboliclight`.")
+        lines.append("Install `symboliclight[postgres]` before running the generated app against Postgres.")
+    return "\n".join(lines) + "\n"
 
 
 def write_new_file(path: Path, content: str) -> None:

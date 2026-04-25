@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.11.0rc1
+
+- Added ecosystem preview docs, contribution guidance, security policy, and GitHub issue/CI templates.
+- Added `slc new api --template ... --backend ...` for Todo, Notes, Admin, and Project Ops starter apps.
+- Added docs, VS Code extension, and release notes maintenance checks.
+- Added v0.10 Project Ops compatibility fixtures.
+- Updated package and VS Code preview versions for the v0.11 release candidate.
+
 ## v0.10.0rc1
 
 - Added explicit store backend clauses with `using sqlite` and `using postgres`.

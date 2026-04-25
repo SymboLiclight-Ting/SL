@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.10
+# SymbolicLight Language Specification v0.11
 
-This document defines SymbolicLight v0.10 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.11 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -280,6 +280,7 @@ slc migrate plan <path> --db path-or-url --json
 slc lsp
 slc init <dir>
 slc new api <name>
+slc new api <name> --template todo|notes|admin|project-ops --backend sqlite|postgres
 slc add route GET /items <path>
 ```
 
@@ -291,7 +292,7 @@ slc add route GET /items <path>
 
 `slc lsp` starts the developer-preview JSON-RPC language server over stdio. v0.9 supports diagnostics, hover, definition, document symbols, and whole-document formatting through the comment-preserving formatter.
 
-`slc init <dir>` creates `src/app.sl`, `intent/app.intent.yaml`, `README.md`, and `.gitignore`. `slc new api <name>` creates the same project shape under `<name>/`. `slc add route` refuses to edit files that contain `//` comments or parser errors.
+`slc init <dir>` creates `src/app.sl`, `intent/app.intent.yaml`, `README.md`, and `.gitignore`. `slc new api <name>` creates the same project shape under `<name>/`. v0.11 adds starter templates for `todo`, `notes`, `admin`, and `project-ops`; `postgres` backend generation is limited to `project-ops`. `slc add route` refuses to edit files that contain `//` comments or parser errors.
 
 `slc doctor` reads optional SL-specific IntentSpec hints from comments:
 

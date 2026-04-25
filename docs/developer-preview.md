@@ -1,6 +1,6 @@
 # SL Developer Preview
 
-SL v0.10 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
+SL v0.11 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
 
 ## What Is Ready
 
@@ -11,6 +11,8 @@ SL v0.10 is a public developer preview. It is usable for experiments, examples, 
 - Try the local VS Code preview extension and playground.
 - Run `slc doctor` to compare SL route and command hints against implementation.
 - Run `slc migrate plan` for read-only database structure planning.
+- Generate starter apps with `slc new api --template ... --backend ...`.
+- Run local docs, VS Code, and release notes checks.
 
 ## What Is Not Stable Yet
 

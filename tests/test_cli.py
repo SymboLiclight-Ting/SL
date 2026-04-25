@@ -2,6 +2,8 @@ from pathlib import Path
 import json
 import py_compile
 import sqlite3
+import subprocess
+import sys
 
 from symboliclight.cli import load_checked_unit, main
 from symboliclight.checker import check_program_result
@@ -33,6 +35,63 @@ def test_cli_notes_example_v04_regression(tmp_path: Path) -> None:
     assert main(["build", str(source), "--out", str(output)]) == 0
     py_compile.compile(str(output), doraise=True)
     assert main(["test", str(source)]) == 0
+
+
+def test_cli_new_api_templates_generate_valid_projects(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    for template in ["todo", "notes", "admin", "project-ops"]:
+        name = f"{template}-demo"
+        assert main(["new", "api", name, "--template", template]) == 0
+        source = tmp_path / name / "src" / "app.sl"
+        output = tmp_path / f"{name}.py"
+        schema = tmp_path / f"{name}.schema.json"
+
+        assert main(["check", str(source)]) == 0
+        assert main(["build", str(source), "--out", str(output)]) == 0
+        py_compile.compile(str(output), doraise=True)
+        assert main(["test", str(source)]) == 0
+        assert main(["schema", str(source), "--out", str(schema)]) == 0
+        assert main(["doctor", str(source)]) == 0
+
+
+def test_cli_new_api_postgres_template(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert main(["new", "api", "ops-pg", "--template", "project-ops", "--backend", "postgres"]) == 0
+    source = tmp_path / "ops-pg" / "src" / "app.sl"
+    output = tmp_path / "ops-pg.py"
+
+    assert main(["check", str(source)]) == 0
+    assert main(["build", str(source), "--out", str(output)]) == 0
+    py_compile.compile(str(output), doraise=True)
+    assert main(["migrate", "plan", str(source), "--db", "postgresql://localhost/symboliclight"]) == 0
+
+
+def test_cli_new_api_rejects_postgres_for_non_project_ops(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert main(["new", "api", "bad", "--template", "todo", "--backend", "postgres"]) == 1
+    assert "Postgres backend is only available for the project-ops template" in capsys.readouterr().err
+
+
+def test_ecosystem_scripts_smoke(tmp_path: Path) -> None:
+    commands = [
+        [sys.executable, str(ROOT / "scripts" / "docs_check.py")],
+        [sys.executable, str(ROOT / "scripts" / "vscode_check.py")],
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "release_notes.py"),
+            "--from",
+            "v0.10.0-rc1",
+            "--to",
+            "HEAD",
+            "--out",
+            str(tmp_path / "release-notes.md"),
+        ],
+    ]
+    for command in commands:
+        completed = subprocess.run(command, cwd=ROOT, check=False)
+        assert completed.returncode == 0
+    notes = (tmp_path / "release-notes.md").read_text(encoding="utf-8")
+    assert "SymbolicLight Release Notes Draft" in notes
 
 
 def test_cli_gallery_examples_v05_regression(tmp_path: Path) -> None:

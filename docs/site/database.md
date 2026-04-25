@@ -20,4 +20,4 @@ Doctor separates metadata drift from structural diff:
 - `schema drift: drift detected` means the stored hash differs.
 - `schema diff: no structural difference detected` means the inspected table structure matches.
 
-Migration plans are read-only in v0.10. SL reports missing tables, extra tables, missing columns, extra columns, and type mismatches, but it does not execute SQL changes or generate destructive migration commands.
+Migration plans are read-only in v0.11. SL reports missing tables, extra tables, missing columns, extra columns, and type mismatches, but it does not execute SQL changes or generate destructive migration commands.

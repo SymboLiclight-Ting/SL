@@ -157,14 +157,23 @@ Deferred to later releases:
 - auth middleware and session management,
 - full ORM-style query builder.
 
-## v0.11 Candidate Direction
+## v0.11 Ecosystem Preview
 
-Likely next work:
+Current work:
 
-- hosted docs preview,
-- package publishing rehearsal when the project owner is ready,
-- richer route and command ergonomics based on external feedback,
-- semantic-token and refactor support for editor tooling.
+- richer Markdown docs site,
+- starter templates through `slc new api --template`,
+- contribution, security, issue template, and CI guidance,
+- local VS Code extension validation,
+- v0.10 Project Ops compatibility fixture,
+- local release notes generation.
+
+Still deferred:
+
+- public package upload,
+- package registry,
+- automatic migrations,
+- v1.0 compatibility guarantees.
 
 ## v1.0 Stable
 

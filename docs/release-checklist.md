@@ -1,7 +1,9 @@
 # Release Checklist
 
 - Run `pytest`.
-- Run `python -m compileall -q src playground`.
+- Run `python -m compileall -q src playground scripts`.
+- Run `python scripts/docs_check.py`.
+- Run `python scripts/vscode_check.py`.
 - Run `slc check examples/todo_app.sl`.
 - Run `slc check --json examples/todo_app.sl`.
 - Run `slc test examples/issue_tracker.sl` to exercise IntentSpec acceptance.
@@ -24,5 +26,6 @@
 - Run `python -m build`.
 - Run `python scripts/package_smoke.py --gallery`.
 - Run `python scripts/release_check.py` for the full package-inclusive release gate.
-- For release candidates, build with a PEP 440 pre-release version such as `0.10.0rc1`.
+- Run `python scripts/release_notes.py --from v0.10.0-rc1 --to HEAD --out build/release-notes.md`.
+- For release candidates, build with a PEP 440 pre-release version such as `0.11.0rc1`.
 - Upload only when the project owner explicitly chooses TestPyPI or PyPI publishing.

@@ -16,6 +16,13 @@ python build/todo_app.py add "Buy milk"
 python build/todo_app.py list
 ```
 
+Try the 10-minute path:
+
+1. Run `slc check examples/todo_app.sl`.
+2. Build with `slc build examples/todo_app.sl --out build/todo_app.py`.
+3. Open `examples/todo_app.sl`, add or edit a route, then run `slc test examples/todo_app.sl`.
+4. Inspect `build/todo_app.py` to see the generated Python.
+
 Generate schema and run doctor:
 
 ```bash
@@ -30,3 +37,9 @@ Run the full local release gate:
 python scripts/release_check.py
 ```
 
+Create a new API project:
+
+```bash
+slc new api my-api --template todo --backend sqlite
+slc check my-api/src/app.sl
+```

@@ -37,6 +37,29 @@ def check_app(source: Path) -> int:
             completed = subprocess.run(command, cwd=ROOT, env=release_env(), check=False)
             if completed.returncode != 0:
                 return completed.returncode
+        postgres_source = source.parent / "app_postgres.sl"
+        if postgres_source.exists():
+            postgres_output = Path(temp_dir) / f"{source.parent.name}-postgres.py"
+            postgres_commands = [
+                [sys.executable, "-m", "symboliclight.cli", "check", str(postgres_source)],
+                [sys.executable, "-m", "symboliclight.cli", "build", str(postgres_source), "--out", str(postgres_output)],
+                [sys.executable, "-m", "py_compile", str(postgres_output)],
+                [
+                    sys.executable,
+                    "-m",
+                    "symboliclight.cli",
+                    "migrate",
+                    "plan",
+                    str(postgres_source),
+                    "--db",
+                    "postgresql://localhost/symboliclight",
+                ],
+            ]
+            for command in postgres_commands:
+                print("$ " + " ".join(command), flush=True)
+                completed = subprocess.run(command, cwd=ROOT, env=release_env(), check=False)
+                if completed.returncode != 0:
+                    return completed.returncode
     return 0
 
 

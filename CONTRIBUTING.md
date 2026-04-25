@@ -1,13 +1,16 @@
 # Contributing
 
-SymbolicLight is currently an MVP application language compiler.
+Thank you for helping improve SymbolicLight.
 
-Before changing language behavior:
+Before opening a pull request:
 
-1. Update `docs/spec.md`.
-2. Update `examples/todo_app.sl` if the golden syntax changes.
-3. Add or update tests.
-4. Run `pytest`.
-5. Build and run the generated Todo app.
+```bash
+pip install -e ".[dev]"
+pytest -q
+python -m compileall -q src playground scripts
+python scripts/release_check.py --skip-package
+```
 
-Keep changes small and focused. Generated Python should remain readable and standard-library based unless there is a documented reason to add a dependency.
+Keep changes small and focused. Syntax changes must update `docs/spec.md`, tests, and examples together.
+
+Use `SL`, `slc`, and `.sl` in developer-facing docs. Use `SymbolicLight` as the formal project name.

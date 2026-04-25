@@ -8,26 +8,26 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.10.0-rc1` 开发中。
-- 当前实现基线：`v0.9.0-rc2`，后续 v0.10 Production App Kit 改动位于其后。
-- 当前 tag：`v0.9.0-rc1` 仍指向 `3e9c196 Implement v0.9 DX stabilization`，未移动；`v0.9.0-rc2` 应指向当前 release bump 提交。
+- 当前版本状态：`v0.11.0-rc1` 开发中。
+- 当前实现基线：`v0.10.0-rc1`，commit `8d750f5 Implement v0.10 production app kit`。
+- 当前 tag：`v0.10.0-rc1` 已完成本地 fresh release 演练。
 - 当前工作树：干净。
-- 发布状态：`v0.9.0-rc2` 已完成本地 fresh release 演练，v0.10 仍未打 tag，未上传 TestPyPI 或 PyPI。
-- 下一 release 动作：完成 v0.10 回归后打 `v0.10.0-rc1` 并重新执行 fresh release 演练。
+- 发布状态：`v0.10.0-rc1` 已完成，v0.11 仍未打 tag，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：完成 v0.11 回归后打 `v0.11.0-rc1` 并重新执行 fresh release 演练。
 
 按“成熟语言 100%”口径估算：
 
 ```text
-当前整体成熟度：约 60%
-当前公开试用准备度：约 90%
-当前 v0.10 development candidate 完成度：约 100%
+当前整体成熟度：约 65%
+当前公开试用准备度：约 92%
+当前 v0.11 ecosystem preview 完成度：开发中
 ```
 
 这三个数字代表不同层级：
 
 - 整体成熟度看的是能否成为稳定、可长期使用、生态完整的应用开发语言。
 - 公开试用准备度看的是外部开发者能否安装、跑示例、理解定位、提交反馈。
-- v0.10 development candidate 完成度看的是当前阶段目标是否完成。
+- v0.11 ecosystem preview 完成度看的是当前阶段目标是否完成。
 
 ## 100% 成熟定义
 
@@ -56,8 +56,8 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 36% 到 40% | v0.4 Standard App Kit | 已完成 | typed route body、Response、fixtures、schema、config、stdlib thin wrappers |
 | 40% 到 42% | v0.5 到 v0.8 Public Preview Hardening | 已完成 | LSP、gallery、IntentSpec、small-admin、schema diff、release RC |
 | 42% 到 50% | v0.9 DX Stabilization | 当前完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
-| 50% 到 60% | v0.10 Production App Kit | 当前完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
-| 60% 到 70% | v0.11 Ecosystem Preview | 下一阶段 | docs site、plugin examples、package story、template gallery |
+| 50% 到 60% | v0.10 Production App Kit | 已完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
+| 60% 到 70% | v0.11 Ecosystem Preview | 当前阶段 | docs site、template gallery、contribution path、release docs |
 | 70% 到 80% | v0.12 Beta | 未开始 | compatibility suite、security review、cross-platform install |
 | 80% 到 90% | v0.13 Release Candidate | 未开始 | syntax freeze candidate、API freeze candidate、migration guides |
 | 90% 到 100% | v1.0 Stable | 未开始 | compatibility guarantee、stable docs、public release |
@@ -400,7 +400,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 50% 到 60%：v0.10 Production App Kit
 
-状态：当前完成，待打 `v0.10.0-rc1` 本地发布候选。
+状态：已完成，`v0.10.0-rc1` 本地发布候选已打 tag 并完成 fresh release 演练。
 
 核心目标：
 
@@ -457,7 +457,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 60% 到 70%：v0.11 Ecosystem Preview
 
-状态：未开始。
+状态：当前阶段。
 
 核心目标：
 
@@ -479,6 +479,9 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 - GitHub issue templates。
 - CONTRIBUTING.md。
 - SECURITY.md。
+- v0.10 Project Ops API compatibility fixture。
+- `slc new api --template ... --backend ...`。
+- docs、VS Code、release notes 静态检查脚本。
 
 建议做：
 
@@ -691,12 +694,12 @@ v1.0 兼容承诺：
 
 ## 下一步推荐
 
-最推荐的下一阶段是 v0.11 Ecosystem Preview，但在进入 v0.11 前应先完成 `v0.10.0-rc1` fresh release 演练。
+最推荐的下一阶段是完成 v0.11 Ecosystem Preview 的 release candidate 收口。
 
 优先级：
 
-1. 打 `v0.10.0-rc1` 并从 tag 重新执行 fresh release 演练。
-2. 冻结 v0.10 Project Ops API 作为新的 compatibility fixture 候选。
+1. 完成 v0.11 文档、模板、贡献路径和 release 脚本。
+2. 打 `v0.11.0-rc1` 并从 tag 重新执行 fresh release 演练。
 3. 准备 hosted docs preview，继续保持 Markdown 源文件。
 4. 梳理 PyPI/TestPyPI 发布 checklist，但是否上传仍由项目 owner 决定。
 5. 基于 gallery 反馈梳理 route、command、store ergonomics 的高频痛点。
