@@ -175,18 +175,27 @@ Deferred from v0.11:
 - automatic migrations,
 - v1.0 compatibility guarantees.
 
-## v0.12 Beta Candidate Direction
+## v0.12 Beta
 
-Next work:
+In progress:
 
 - Windows, macOS, and Linux CI,
 - Python 3.11 and 3.12 validation,
-- package install smoke across clean environments,
-- generated Python security review,
-- path/file builtins boundary review,
-- HTTP body and JSON failure consistency,
-- SQLite/Postgres error mapping,
-- stable CLI exit code audit.
+- package install smoke across clean environments with selectable Python,
+- generated Python security review in `docs/security-review.md`,
+- path/file builtins boundary guards,
+- HTTP body size limits and JSON failure consistency,
+- SQLite/Postgres error mapping through generated store helper wrappers,
+- stable CLI exit code audit,
+- v0.11 compatibility fixtures.
+
+Deferred from v0.12:
+
+- public package upload,
+- native compiler,
+- package registry,
+- automatic migrations,
+- production-grade HTTP hosting.
 
 ## v1.0 Stable
 

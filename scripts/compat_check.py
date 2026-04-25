@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> int:
-    apps = sorted((ROOT / "tests" / "compat").glob("v0_*/*/app.sl"))
+    compat = ROOT / "tests" / "compat"
+    apps = sorted({*compat.glob("v0_*/*/app.sl"), *compat.glob("v0_*/*/src/app.sl")})
     if not apps:
         print("error: no compat fixtures found", file=sys.stderr)
         return 1
@@ -26,12 +27,27 @@ def main() -> int:
 def check_app(source: Path) -> int:
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / f"{source.parent.name}.py"
+        is_postgres_app = " using postgres" in source.read_text(encoding="utf-8")
         commands = [
             [sys.executable, "-m", "symboliclight.cli", "check", str(source)],
             [sys.executable, "-m", "symboliclight.cli", "build", str(source), "--out", str(output)],
             [sys.executable, "-m", "py_compile", str(output)],
-            [sys.executable, "-m", "symboliclight.cli", "test", str(source)],
         ]
+        if not is_postgres_app:
+            commands.append([sys.executable, "-m", "symboliclight.cli", "test", str(source)])
+        else:
+            commands.append(
+                [
+                    sys.executable,
+                    "-m",
+                    "symboliclight.cli",
+                    "migrate",
+                    "plan",
+                    str(source),
+                    "--db",
+                    "postgresql://localhost/symboliclight",
+                ]
+            )
         for command in commands:
             print("$ " + " ".join(command), flush=True)
             completed = subprocess.run(command, cwd=ROOT, env=release_env(), check=False)

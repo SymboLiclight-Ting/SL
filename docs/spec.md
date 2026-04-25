@@ -166,7 +166,18 @@ route POST "/todos" body CreateTodo -> Todo {
 }
 ```
 
-`GET` and `DELETE` routes may not declare a body in v0.4. `POST`, `PUT`, and `PATCH` routes may declare a record body. When a body type is declared, `request.body.field` is checked against that record. Generated Python returns `400` for malformed JSON and for missing required body fields.
+`GET` and `DELETE` routes may not declare a body in v0.4. `POST`, `PUT`, and `PATCH` routes may declare a record body. When a body type is declared, `request.body.field` is checked against that record. Generated Python returns stable JSON errors for malformed JSON, non-object JSON bodies, and missing required body fields.
+
+Generated HTTP handlers enforce a fixed v0.12 request body limit of `1_000_000` bytes. Requests above that limit return `413` with the same JSON error envelope used by other generated HTTP errors:
+
+```json
+{
+  "error": {
+    "code": "payload_too_large",
+    "message": "Request body exceeds the 1000000 byte limit."
+  }
+}
+```
 
 Routes may return `Response<T>` by using the `response` built-in:
 
@@ -257,7 +268,7 @@ v0.4 supports:
 - app-kit built-ins: `response`, `response_ok`, `response_err`, `env`, `env_int`, `uuid`, `now`, `read_text`, and `write_text`.
 - route request helper: `request.header(name: Text) -> Option<Text>`.
 
-`read_text` may be used in commands, routes, and tests. `write_text` may be used only in commands and tests.
+`read_text` may be used in commands, routes, and tests. `write_text` may be used only in commands and tests. Generated Python rejects empty paths and directory paths before opening files, and reports file errors as runtime errors with the failing operation name.
 
 ## CLI
 
@@ -294,6 +305,12 @@ slc add route GET /items <path>
 
 `slc init <dir>` creates `src/app.sl`, `intent/app.intent.yaml`, `README.md`, and `.gitignore`. `slc new api <name>` creates the same project shape under `<name>/`. v0.11 adds starter templates for `todo`, `notes`, `admin`, and `project-ops`; `postgres` backend generation is limited to `project-ops`. `slc add route` refuses to edit files that contain `//` comments or parser errors.
 
+CLI exit codes are stable in v0.12:
+
+- `0`: success or warnings only,
+- `1`: parser, checker, runtime, test, doctor, migrate, or package smoke failure,
+- `2`: CLI argument errors reported by `argparse`.
+
 `slc doctor` reads optional SL-specific IntentSpec hints from comments:
 
 ```yaml
@@ -321,6 +338,19 @@ The compiler emits one Python 3.11 file using standard library modules first:
 - `json`
 
 Postgres apps import `psycopg` lazily at runtime and require the optional `symboliclight[postgres]` install extra.
+
+Generated HTTP error responses use this envelope for generated runtime errors:
+
+```json
+{
+  "error": {
+    "code": "bad_request",
+    "message": "Request body must be valid JSON."
+  }
+}
+```
+
+Route handler exceptions are mapped to `500` with `internal_error` in the HTTP response. CLI commands still surface tracebacks and best-effort `.sl` source backreferences for developer debugging.
 
 Generated code includes `# source: file.sl:line` comments for major functions, routes, and tests. `slc build` also emits a sidecar source map by default:
 

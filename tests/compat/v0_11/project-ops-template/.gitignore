@@ -1,0 +1,4 @@
+.slcache/
+build/
+*.sqlite
+__pycache__/

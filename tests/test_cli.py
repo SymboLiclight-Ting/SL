@@ -79,8 +79,6 @@ def test_ecosystem_scripts_smoke(tmp_path: Path) -> None:
         [
             sys.executable,
             str(ROOT / "scripts" / "release_notes.py"),
-            "--from",
-            "v0.10.0-rc1",
             "--to",
             "HEAD",
             "--out",

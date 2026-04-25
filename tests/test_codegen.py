@@ -1,4 +1,5 @@
 from pathlib import Path
+import http.client
 import json
 import os
 import py_compile
@@ -305,7 +306,12 @@ app HttpBody {
         except urllib.error.HTTPError as exc:
             assert exc.code == 400
             error_payload = json.loads(exc.read().decode("utf-8"))
-            assert error_payload["error"] == "malformed JSON body"
+            assert error_payload == {
+                "error": {
+                    "code": "bad_request",
+                    "message": "Request body must be valid JSON.",
+                }
+            }
 
         missing_request = urllib.request.Request(
             f"http://127.0.0.1:{port}/todos",
@@ -319,7 +325,77 @@ app HttpBody {
         except urllib.error.HTTPError as exc:
             assert exc.code == 400
             error_payload = json.loads(exc.read().decode("utf-8"))
-            assert error_payload["fields"] == ["title"]
+            assert error_payload == {
+                "error": {
+                    "code": "bad_request",
+                    "message": "Missing required body field(s): title.",
+                }
+            }
+
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.putrequest("POST", "/todos")
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", "1000001")
+        conn.endheaders()
+        response = conn.getresponse()
+        assert response.status == 413
+        error_payload = json.loads(response.read().decode("utf-8"))
+        assert error_payload["error"]["code"] == "payload_too_large"
+        conn.close()
+
+        unsupported = urllib.request.Request(
+            f"http://127.0.0.1:{port}/todos",
+            method="TRACE",
+        )
+        try:
+            urllib.request.urlopen(unsupported, timeout=5)
+            raise AssertionError("expected unsupported method to fail")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 405
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            assert error_payload["error"]["code"] == "method_not_allowed"
+    finally:
+        server.terminate()
+        server.wait(timeout=10)
+
+
+def test_generated_http_runtime_exception_returns_stable_error(tmp_path: Path) -> None:
+    source = """
+app RuntimeHttpError {
+  route GET "/boom" -> Text {
+    return read_text("")
+  }
+}
+"""
+    app_path = tmp_path / "runtime_http_error.sl"
+    app_path.write_text(source, encoding="utf-8")
+    app = parse_source(source, path=str(app_path))
+    diagnostics = check_program(app, source_path=app_path)
+    output = tmp_path / "runtime_http_error.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+    port = free_port()
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    server = subprocess.Popen(
+        [sys.executable, str(output), "serve", "--port", str(port)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        wait_for_server(port)
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/boom", timeout=5)
+            raise AssertionError("expected runtime exception to fail")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 500
+            assert json.loads(exc.read().decode("utf-8")) == {
+                "error": {
+                    "code": "internal_error",
+                    "message": "Internal server error.",
+                }
+            }
     finally:
         server.terminate()
         server.wait(timeout=10)
@@ -605,6 +681,42 @@ app TryUpdateRuntime {
     )
 
     assert "ok - 1 test(s) passed" in completed.stdout
+
+
+def test_generated_file_builtins_reject_empty_and_directory_paths(tmp_path: Path) -> None:
+    source = """
+app FileGuards {
+  command read_empty() -> Text {
+    return read_text("")
+  }
+
+  command write_dir(path: Text) -> Bool {
+    return write_text(path, "content")
+  }
+}
+"""
+    app = parse_source(source, path="file_guards.sl")
+    diagnostics = check_program(app, source_path=Path("file_guards.sl"))
+    output = tmp_path / "file_guards.py"
+    output.write_text(generate_python(app), encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    py_compile.compile(str(output), doraise=True)
+    empty = subprocess.run(
+        [sys.executable, str(output), "read_empty"],
+        capture_output=True,
+        text=True,
+    )
+    directory = subprocess.run(
+        [sys.executable, str(output), "write_dir", str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert empty.returncode != 0
+    assert "file path must be a non-empty Text value" in empty.stderr
+    assert directory.returncode != 0
+    assert "file path points to a directory" in directory.stderr
 
 
 def test_generated_response_helpers_return_result_payloads(tmp_path: Path) -> None:

@@ -4,6 +4,7 @@
 - Run `python -m compileall -q src playground scripts`.
 - Run `python scripts/docs_check.py`.
 - Run `python scripts/vscode_check.py`.
+- Run `python scripts/cross_platform_smoke.py` when doing local preflight.
 - Run `slc check examples/todo_app.sl`.
 - Run `slc check --json examples/todo_app.sl`.
 - Run `slc test examples/issue_tracker.sl` to exercise IntentSpec acceptance.
@@ -23,9 +24,11 @@
 - Confirm README quick start matches actual CLI behavior.
 - Confirm `slc lsp --help` is available.
 - Run `python scripts/release_check.py --skip-package`.
+- Run `python scripts/release_check.py --fast` for a shorter beta hardening gate.
 - Run `python -m build`.
 - Run `python scripts/package_smoke.py --gallery`.
+- Run `python scripts/package_smoke.py --gallery --python path/to/python` when checking a specific Python interpreter.
 - Run `python scripts/release_check.py` for the full package-inclusive release gate.
-- Run `python scripts/release_notes.py --from v0.10.0-rc1 --to HEAD --out build/release-notes.md`.
-- For release candidates, build with a PEP 440 pre-release version such as `0.11.0rc1`.
+- Run `python scripts/release_notes.py --to HEAD --out build/release-notes.md`.
+- For release candidates, build with a PEP 440 pre-release version such as `0.12.0rc1`.
 - Upload only when the project owner explicitly chooses TestPyPI or PyPI publishing.

@@ -16,6 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install the built SL wheel and run smoke checks.")
     parser.add_argument("--wheel", type=Path)
     parser.add_argument("--gallery", action="store_true", help="Run gallery examples from an empty workspace.")
+    parser.add_argument("--python", type=Path, help="Python executable used to create the smoke-test virtualenv.")
     args = parser.parse_args(argv)
     wheel = args.wheel or latest_wheel()
     if wheel is None:
@@ -27,7 +28,8 @@ def main(argv: list[str] | None = None) -> int:
         app = temp / "smoke.sl"
         built = temp / "smoke.py"
         app.write_text(SMOKE_SOURCE, encoding="utf-8")
-        run([sys.executable, "-m", "venv", str(venv_dir)])
+        host_python = args.python or Path(sys.executable)
+        run([str(host_python), "-m", "venv", str(venv_dir)])
         python = venv_python(venv_dir)
         run([str(python), "-m", "pip", "install", "--force-reinstall", "--no-index", str(wheel)], isolated=True)
         run([str(python), "-m", "symboliclight.cli", "check", str(app)], isolated=True)
@@ -36,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         run([str(python), str(built), "test"], isolated=True)
         run([str(slc_command(venv_dir)), "--help"], isolated=True)
         if args.gallery:
-            run_gallery_smoke(slc_command(venv_dir), temp)
+            run_gallery_smoke(slc_command(venv_dir), python, temp)
     print(f"ok - package smoke passed for {wheel.name}")
     return 0
 
@@ -58,7 +60,7 @@ def slc_command(venv_dir: Path) -> Path:
     return venv_dir / "bin" / "slc"
 
 
-def run_gallery_smoke(slc: Path, temp: Path) -> None:
+def run_gallery_smoke(slc: Path, python: Path, temp: Path) -> None:
     workspace = temp / "workspace"
     gallery = workspace / "gallery"
     shutil.copytree(ROOT / "examples" / "gallery", gallery)
@@ -74,7 +76,7 @@ def run_gallery_smoke(slc: Path, temp: Path) -> None:
             postgres_out = workspace / f"{stem}_postgres.py"
             run([str(slc), "check", str(postgres_app)], isolated=True)
             run([str(slc), "build", str(postgres_app), "--out", str(postgres_out)], isolated=True)
-            run([sys.executable, "-m", "py_compile", str(postgres_out)], isolated=True)
+            run([str(python), "-m", "py_compile", str(postgres_out)], isolated=True)
             run([str(slc), "migrate", "plan", str(postgres_app), "--db", "postgresql://localhost/symboliclight"], isolated=True)
 
 

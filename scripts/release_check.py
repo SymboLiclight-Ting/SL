@@ -14,8 +14,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the SL release smoke checks.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-package", action="store_true")
+    parser.add_argument("--fast", action="store_true", help="Skip wheel build and run a shorter gallery gate.")
     args = parser.parse_args(argv)
-    commands = release_commands(skip_package=args.skip_package)
+    commands = release_commands(skip_package=args.skip_package or args.fast, fast=args.fast)
     for command in commands:
         print("$ " + " ".join(command), flush=True)
         if args.dry_run:
@@ -26,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def release_commands(*, skip_package: bool) -> list[list[str]]:
+def release_commands(*, skip_package: bool, fast: bool = False) -> list[list[str]]:
     python = sys.executable
     commands: list[list[str]] = [
         [python, "-m", "pytest", "-q"],
@@ -44,16 +45,22 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
         [python, "-m", "symboliclight.cli", "doctor", "examples/notes_api.sl"],
         [python, "scripts/doctor_drift_smoke.py"],
         [python, "scripts/compat_check.py"],
-        [python, "scripts/release_notes.py", "--from", "v0.10.0-rc1", "--to", "HEAD", "--out", "build/release-notes.md"],
+        [python, "scripts/release_notes.py", "--to", "HEAD", "--out", "build/release-notes.md"],
     ]
-    for source in [
+    gallery_sources = [
         "examples/gallery/todo-api-cli/app.sl",
         "examples/gallery/notes-api/app.sl",
         "examples/gallery/issue-tracker/app.sl",
         "examples/gallery/customer-brief-generator/app.sl",
         "examples/gallery/small-admin-backend/app.sl",
         "examples/gallery/project-ops-api/app.sl",
-    ]:
+    ]
+    if fast:
+        gallery_sources = [
+            "examples/gallery/todo-api-cli/app.sl",
+            "examples/gallery/project-ops-api/app.sl",
+        ]
+    for source in gallery_sources:
         stem = Path(source).parent.name
         commands.extend(
             [

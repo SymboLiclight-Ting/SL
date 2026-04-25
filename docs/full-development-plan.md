@@ -8,19 +8,19 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.11.0-rc1` 已完成。
-- 当前实现基线：`v0.11.0-rc1`，commit `1d7e433 Implement v0.11 ecosystem preview`。
-- 当前 tag：`v0.11.0-rc1` 已完成本地 fresh release 演练。
-- 当前工作树：干净。
-- 发布状态：`v0.11.0-rc1` 已完成，未上传 TestPyPI 或 PyPI。
-- 下一 release 动作：进入 v0.12 Beta，补齐三平台、安装、安全和兼容性硬化。
+- 当前版本状态：`v0.12.0-rc1` beta hardening 正在收口。
+- 当前实现基线：从 `v0.11.0-rc1` 进入 v0.12 开发线。
+- 当前 tag：`v0.11.0-rc1` 已完成本地 fresh release 演练，`v0.12.0-rc1` 将在 release gate 通过后本地标记。
+- 当前工作树：v0.12 beta hardening 改动中。
+- 发布状态：继续本地 RC 演练，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：完成三平台 CI、Python 3.11/3.12、安装 smoke、安全边界、HTTP/JSON 错误一致性和 CLI exit code 稳定后打 `v0.12.0-rc1`。
 
 按“成熟语言 100%”口径估算：
 
 ```text
-当前整体成熟度：约 70%
-当前公开试用准备度：约 94%
-当前 v0.11 ecosystem preview 完成度：100%
+当前整体成熟度：约 75%，v0.12 完成后目标约 80%
+当前公开试用准备度：约 96%
+当前 v0.12 beta hardening 完成度：进行中
 ```
 
 这三个数字代表不同层级：
@@ -58,7 +58,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 42% 到 50% | v0.9 DX Stabilization | 当前完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
 | 50% 到 60% | v0.10 Production App Kit | 已完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
 | 60% 到 70% | v0.11 Ecosystem Preview | 已完成 | docs site、template gallery、contribution path、release docs |
-| 70% 到 80% | v0.12 Beta | 下一阶段 | compatibility suite、security review、cross-platform install |
+| 70% 到 80% | v0.12 Beta | 当前阶段 | compatibility suite、security review、cross-platform install |
 | 80% 到 90% | v0.13 Release Candidate | 未开始 | syntax freeze candidate、API freeze candidate、migration guides |
 | 90% 到 100% | v1.0 Stable | 未开始 | compatibility guarantee、stable docs、public release |
 

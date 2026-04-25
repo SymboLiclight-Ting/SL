@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.12.0rc1
+
+- Added beta hardening for generated HTTP errors, including stable JSON envelopes and a fixed request body limit.
+- Added runtime guards for `read_text` and `write_text` empty paths and directory paths.
+- Wrapped generated store helper database exceptions with stable operation names.
+- Added CLI exit code coverage for compiler, runtime, doctor, migrate, project generation, formatter, and argparse failures.
+- Added Windows, macOS, Linux and Python 3.11/3.12 CI matrix coverage.
+- Added v0.11 compatibility fixtures and beta release smoke script improvements.
+- Added v0.12 security review documentation.
+
 ## v0.11.0rc1
 
 - Added ecosystem preview docs, contribution guidance, security policy, and GitHub issue/CI templates.

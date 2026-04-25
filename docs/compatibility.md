@@ -145,3 +145,14 @@ v0.11 is an ecosystem preview and does not add core `.sl` syntax:
 - `postgres` template generation is limited to the Project Ops starter,
 - docs, VS Code, release notes, and GitHub metadata are project assets, not v1.0 compatibility commitments,
 - v0.10 Project Ops is frozen as a compatibility fixture.
+
+## v0.12 Notes
+
+v0.12 is a beta hardening release and does not add core `.sl` syntax:
+
+- generated HTTP framework errors now use a stable `{"error": {"code": ..., "message": ...}}` envelope,
+- generated HTTP handlers reject request bodies above `1_000_000` bytes,
+- `read_text` and `write_text` now reject empty paths and directory paths at runtime,
+- generated store helpers wrap database driver exceptions with stable operation names,
+- CLI exit codes are documented as `0` for success or warnings, `1` for compiler/runtime/check failures, and `2` for `argparse` usage errors,
+- `tests/compat/v0_11/` freezes v0.11 starter-template output as a compatibility baseline.

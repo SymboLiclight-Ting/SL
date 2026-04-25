@@ -33,6 +33,8 @@ Named arguments are checked against declared function and command parameters. Un
 
 `route` is an HTTP boundary. Routes may call pure functions and store methods, but may not call commands directly.
 
+Generated route handlers return a stable JSON error envelope for framework-level failures such as malformed JSON, missing typed body fields, oversized bodies, unsupported generated methods, and uncaught route exceptions. The envelope is `{"error": {"code": Text, "message": Text}}`. Route exceptions are logged to stderr with best-effort `.sl` source backreferences, but generated HTTP responses do not include Python tracebacks.
+
 `test` blocks may call commands so tests can exercise the public CLI-shaped application behavior.
 
 ## Store Semantics
@@ -63,7 +65,7 @@ Supported store methods:
 
 `count()` returns the number of rows in a store. `exists(id)` checks whether an item exists. `clear()` deletes all rows and is allowed only in `test` blocks.
 
-Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.10 does not automatically migrate data and does not replace the stored hash on drift. A matching hash is metadata evidence only; it is not a substitute for structural inspection.
+Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.12 does not automatically migrate data and does not replace the stored hash on drift. A matching hash is metadata evidence only; it is not a substitute for structural inspection.
 
 `slc doctor --db path-or-url` can inspect the same metadata without running the generated app. SQLite paths and Postgres URLs are supported. The report is read-only. It separates hash state from table structure: `schema drift: up to date` means the hash matches, `schema diff: no structural difference detected` means table structure matches, `schema drift: structural drift detected` means the hash matches but the actual schema differs, and `schema drift: drift detected` means the stored hash differs from the generated hash. Drift reports include summary schema differences and a manual migration suggestion; v0.10 never modifies application data.
 
@@ -100,7 +102,7 @@ Thin standard-library built-ins are mapped to Python stdlib:
 - `now` uses UTC ISO timestamps,
 - `read_text` and `write_text` use UTF-8 text files.
 
-`read_text` is allowed from commands, routes, and tests. `write_text` is allowed only from commands and tests.
+`read_text` is allowed from commands, routes, and tests. `write_text` is allowed only from commands and tests. The generated runtime rejects empty paths and directory paths before opening files. File-system failures are re-raised as runtime errors that include the failing builtin name, so command-line debugging remains explicit.
 
 ## Enum Semantics
 

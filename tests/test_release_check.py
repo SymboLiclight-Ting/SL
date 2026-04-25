@@ -29,3 +29,14 @@ def test_release_check_includes_package_smoke_when_not_skipped() -> None:
 
     assert any(command.endswith(" -m build") for command in commands)
     assert any("scripts/package_smoke.py --gallery" in command for command in commands)
+
+
+def test_release_check_fast_skips_package_and_keeps_core_gallery() -> None:
+    commands = [" ".join(command) for command in release_commands(skip_package=True, fast=True)]
+
+    assert any("pytest -q" in command for command in commands)
+    assert any("examples/gallery/todo-api-cli/app.sl" in command for command in commands)
+    assert any("examples/gallery/project-ops-api/app.sl" in command for command in commands)
+    assert not any("examples/gallery/customer-brief-generator/app.sl" in command for command in commands)
+    assert not any(command.endswith(" -m build") for command in commands)
+    assert not any("scripts/package_smoke.py" in command for command in commands)
