@@ -159,7 +159,7 @@ Deferred to later releases:
 
 ## v0.11 Ecosystem Preview
 
-Current work:
+Implemented:
 
 - richer Markdown docs site,
 - starter templates through `slc new api --template`,
@@ -168,12 +168,25 @@ Current work:
 - v0.10 Project Ops compatibility fixture,
 - local release notes generation.
 
-Still deferred:
+Deferred from v0.11:
 
 - public package upload,
 - package registry,
 - automatic migrations,
 - v1.0 compatibility guarantees.
+
+## v0.12 Beta Candidate Direction
+
+Next work:
+
+- Windows, macOS, and Linux CI,
+- Python 3.11 and 3.12 validation,
+- package install smoke across clean environments,
+- generated Python security review,
+- path/file builtins boundary review,
+- HTTP body and JSON failure consistency,
+- SQLite/Postgres error mapping,
+- stable CLI exit code audit.
 
 ## v1.0 Stable
 

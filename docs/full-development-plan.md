@@ -8,19 +8,19 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.11.0-rc1` 开发中。
-- 当前实现基线：`v0.10.0-rc1`，commit `8d750f5 Implement v0.10 production app kit`。
-- 当前 tag：`v0.10.0-rc1` 已完成本地 fresh release 演练。
+- 当前版本状态：`v0.11.0-rc1` 已完成。
+- 当前实现基线：`v0.11.0-rc1`，commit `1d7e433 Implement v0.11 ecosystem preview`。
+- 当前 tag：`v0.11.0-rc1` 已完成本地 fresh release 演练。
 - 当前工作树：干净。
-- 发布状态：`v0.10.0-rc1` 已完成，v0.11 仍未打 tag，未上传 TestPyPI 或 PyPI。
-- 下一 release 动作：完成 v0.11 回归后打 `v0.11.0-rc1` 并重新执行 fresh release 演练。
+- 发布状态：`v0.11.0-rc1` 已完成，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：进入 v0.12 Beta，补齐三平台、安装、安全和兼容性硬化。
 
 按“成熟语言 100%”口径估算：
 
 ```text
-当前整体成熟度：约 65%
-当前公开试用准备度：约 92%
-当前 v0.11 ecosystem preview 完成度：开发中
+当前整体成熟度：约 70%
+当前公开试用准备度：约 94%
+当前 v0.11 ecosystem preview 完成度：100%
 ```
 
 这三个数字代表不同层级：
@@ -57,8 +57,8 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 40% 到 42% | v0.5 到 v0.8 Public Preview Hardening | 已完成 | LSP、gallery、IntentSpec、small-admin、schema diff、release RC |
 | 42% 到 50% | v0.9 DX Stabilization | 当前完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
 | 50% 到 60% | v0.10 Production App Kit | 已完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
-| 60% 到 70% | v0.11 Ecosystem Preview | 当前阶段 | docs site、template gallery、contribution path、release docs |
-| 70% 到 80% | v0.12 Beta | 未开始 | compatibility suite、security review、cross-platform install |
+| 60% 到 70% | v0.11 Ecosystem Preview | 已完成 | docs site、template gallery、contribution path、release docs |
+| 70% 到 80% | v0.12 Beta | 下一阶段 | compatibility suite、security review、cross-platform install |
 | 80% 到 90% | v0.13 Release Candidate | 未开始 | syntax freeze candidate、API freeze candidate、migration guides |
 | 90% 到 100% | v1.0 Stable | 未开始 | compatibility guarantee、stable docs、public release |
 
@@ -457,7 +457,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 60% 到 70%：v0.11 Ecosystem Preview
 
-状态：当前阶段。
+状态：已完成，`v0.11.0-rc1` 本地发布候选已打 tag 并完成 fresh release 演练。
 
 核心目标：
 
@@ -694,20 +694,20 @@ v1.0 兼容承诺：
 
 ## 下一步推荐
 
-最推荐的下一阶段是完成 v0.11 Ecosystem Preview 的 release candidate 收口。
+最推荐的下一阶段是 v0.12 Beta，重点做兼容性、跨平台安装、安全边界和真实数据库集成硬化。
 
 优先级：
 
-1. 完成 v0.11 文档、模板、贡献路径和 release 脚本。
-2. 打 `v0.11.0-rc1` 并从 tag 重新执行 fresh release 演练。
-3. 准备 hosted docs preview，继续保持 Markdown 源文件。
+1. 建立 Windows、macOS、Linux CI 矩阵，至少覆盖 Python 3.11 和 3.12。
+2. 把 v0.10、v0.11 release candidates 纳入兼容性 fixture 说明和回归基线。
+3. 做 generated Python security review，重点看 path/file builtins、HTTP body parsing、SQLite/Postgres error mapping。
 4. 梳理 PyPI/TestPyPI 发布 checklist，但是否上传仍由项目 owner 决定。
 5. 基于 gallery 反馈梳理 route、command、store ergonomics 的高频痛点。
 
-v0.11 的成功标准：
+v0.12 的成功标准：
 
-- 文档站可以本地或静态托管预览。
-- 示例模板和 gallery 入口更容易被外部开发者发现。
-- v0.6 到 v0.10 compatibility fixtures 继续通过。
-- packaging 和 release checklist 足够清晰，可以支持一次人工发布演练。
+- 三平台 CI 可以跑通核心测试。
+- v0.6 到 v0.11 compatibility fixtures 继续通过。
+- 安装包可以在干净环境中稳定使用。
+- security review 没有 P0/P1 未解决项。
 - 文档明确告诉用户哪些能力可试用，哪些仍是实验性能力。

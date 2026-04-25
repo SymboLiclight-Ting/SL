@@ -2,19 +2,19 @@
 
 Current focus:
 
-- harden the production app kit,
-- keep generated Python readable,
-- validate SL against real sample applications,
-- improve IntentSpec and release workflows,
-- avoid expanding core syntax before the language shape is proven.
+- beta hardening,
+- cross-platform install checks,
+- Python 3.11 and 3.12 validation,
+- compatibility fixture expansion,
+- generated Python security review,
+- stable CLI exit code audit.
 
 Near-term candidates:
 
-- ecosystem preview documentation,
-- starter templates for common app shapes,
-- compatibility fixtures for v0.10 Project Ops API,
-- local contribution and release process,
-- local VS Code extension validation.
+- hosted docs preview,
+- package publishing rehearsal when the project owner is ready,
+- real Postgres integration testing,
+- richer route and command ergonomics based on feedback.
 
 Long-term goal:
 
