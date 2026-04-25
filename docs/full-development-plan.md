@@ -8,25 +8,26 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.8.0-rc1` 本地发布候选。
-- 当前提交：`aca0590 Polish v0.8 release readiness`。
-- 当前 tag：`v0.8.0-rc1`。
+- 当前版本状态：`v0.9.0-rc1` 本地发布候选，另有 post-RC review polish 提交。
+- 当前实现基线：`12b1aeb Polish v0.9 review diagnostics`，本规划文档更新提交位于其后。
+- 当前 tag：`v0.9.0-rc1`，仍指向 `3e9c196 Implement v0.9 DX stabilization`，未移动。
 - 当前工作树：干净。
-- 发布状态：已完成本地 tag fresh checkout release 演练，未上传 TestPyPI 或 PyPI。
+- 发布状态：已完成本地 release check 和 post-RC review 收口，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：如果继续发布候选，应从当前 HEAD 打 `v0.9.0-rc2`，不要移动已有 `v0.9.0-rc1`。
 
 按“成熟语言 100%”口径估算：
 
 ```text
-当前整体成熟度：约 42%
-当前公开试用准备度：约 82%
-当前 v0.8 release candidate 完成度：约 100%
+当前整体成熟度：约 50%
+当前公开试用准备度：约 88%
+当前 v0.9 release candidate 完成度：约 100%
 ```
 
 这三个数字代表不同层级：
 
 - 整体成熟度看的是能否成为稳定、可长期使用、生态完整的应用开发语言。
 - 公开试用准备度看的是外部开发者能否安装、跑示例、理解定位、提交反馈。
-- v0.8 release candidate 完成度看的是当前阶段目标是否完成。
+- v0.9 release candidate 完成度看的是当前阶段目标是否完成。
 
 ## 100% 成熟定义
 
@@ -53,9 +54,9 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 20% 到 30% | v0.2 Core Freeze | 已完成 | module、enum、Option、Result、formatter、compat docs |
 | 30% 到 36% | v0.3 Reliable Compiler | 已完成 | parser recovery、strict checker、source map、cache、CLI polish |
 | 36% 到 40% | v0.4 Standard App Kit | 已完成 | typed route body、Response、fixtures、schema、config、stdlib thin wrappers |
-| 40% 到 42% | v0.5 到 v0.8 Public Preview Hardening | 当前完成 | LSP、gallery、IntentSpec、small-admin、schema diff、release RC |
-| 42% 到 50% | v0.9 DX Stabilization | 下一阶段 | comment-preserving formatter、LSP polish、compat fixtures |
-| 50% 到 60% | v0.10 Production App Kit | 未开始 | Postgres、migration plan、auth helpers、larger real apps |
+| 40% 到 42% | v0.5 到 v0.8 Public Preview Hardening | 已完成 | LSP、gallery、IntentSpec、small-admin、schema diff、release RC |
+| 42% 到 50% | v0.9 DX Stabilization | 当前完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
+| 50% 到 60% | v0.10 Production App Kit | 下一阶段 | Postgres、migration plan、auth helpers、larger real apps |
 | 60% 到 70% | v0.11 Ecosystem Preview | 未开始 | docs site、plugin examples、package story、template gallery |
 | 70% 到 80% | v0.12 Beta | 未开始 | compatibility suite、security review、cross-platform install |
 | 80% 到 90% | v0.13 Release Candidate | 未开始 | syntax freeze candidate、API freeze candidate、migration guides |
@@ -238,7 +239,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 40% 到 42%：v0.5 到 v0.8 Public Preview Hardening
 
-状态：当前已完成到 `v0.8.0-rc1`。
+状态：已完成到 `v0.8.0-rc1`，并被 v0.9 兼容 fixtures 覆盖。
 
 这一段是当前项目的实际落点。它不是成熟语言的终点，而是一个可公开试用的本地发布候选。
 
@@ -325,7 +326,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 42% 到 50%：v0.9 DX Stabilization
 
-状态：下一阶段。
+状态：当前已完成到 `v0.9.0-rc1`，并有 post-RC review polish 提交。
 
 核心目标：
 
@@ -333,25 +334,40 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 - 把开发者体验和兼容性做扎实。
 - 让外部开发者第一次试用时不容易踩坑。
 
-必须做：
+已完成：
 
-- comment-preserving formatter。
-- formatter snapshot tests。
-- LSP hover 类型覆盖更多表达式。
-- LSP definition 支持 imported type、enum、store、command、route symbol。
-- LSP diagnostics 与 CLI diagnostics 完全一致。
+- comment-preserving formatter，覆盖文件头注释、item 前注释、statement 前注释和 trailing comment。
+- formatter 幂等测试和含注释格式化回归。
+- LSP hover 扩展到 type、enum variant、store helper、function、command、config field、route body field。
+- LSP definition 扩展到本文件和 imported module 中的 type、enum、fn、store、command、route。
+- LSP document symbols 覆盖 app、module、type、enum、config、store、fixture、fn、command、route、test。
+- LSP formatting 复用 comment-preserving formatter。
 - `slc fmt` 不再因为 `//` comment 拒绝整个文件。
-- `slc doctor` 输出更适合 CI 使用。
-- 增加 `--json` doctor 输出，供 AI 工具和 CI 消费。
-- 历史 gallery 兼容 fixtures。
+- `slc doctor --json`，供 AI 工具、CI 和 editor tooling 消费。
+- `doctor --json` 稳定输出 `source`、`unit`、`diagnostics`、`summary`、`intent`、`schema`、`cache`、`source_map`。
+- `schema.drift` 稳定枚举：`not_checked`、`not_initialized`、`up_to_date`、`structural_drift`、`hash_drift`、`unable_to_inspect`。
+- v0.6、v0.7、v0.8 compatibility fixtures。
+- `docs/site/` Markdown 文档站骨架。
+- `pyproject.toml` 升级到 `0.9.0rc1`。
+- 本地 tag `v0.9.0-rc1`。
+- post-RC review polish，移除 release-facing 诊断中的旧版本字样。
 
-建议做：
+已验证：
+
+- `pytest -q`。
+- `python -m compileall -q src playground scripts`。
+- `python scripts\release_check.py`。
+- fresh tag checkout release 演练。
+- 本地 wheel install smoke。
+
+推迟到后续：
 
 - `slc explain <diagnostic-code>`。
 - `slc examples list`。
 - `slc examples copy <name> <dir>`。
-- VS Code extension 打包脚本。
-- Playground 增加示例选择。
+- VS Code extension 打包脚本和 marketplace 发布。
+- Playground 示例选择。
+- hosted documentation publishing。
 
 明确不做：
 
@@ -367,6 +383,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 - VS Code 打开 gallery 示例时 diagnostics、hover、definition 可用。
 - `doctor --json` 输出稳定 schema。
 - v0.6、v0.7、v0.8 示例仍可 check/build/test。
+- post-RC review 中的 schema drift、imported store type、`response_err` 自定义 error record、runtime drift metadata 覆盖风险已复核。
 
 完成后成熟度估计：
 
@@ -374,6 +391,12 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 整体成熟度：约 50%
 公开试用准备度：约 88%
 ```
+
+发布状态：
+
+- `v0.9.0-rc1` 已存在，不应移动。
+- 当前 HEAD 在 `v0.9.0-rc1` 之后包含 `12b1aeb Polish v0.9 review diagnostics`。
+- 如果要继续 release candidate，应打 `v0.9.0-rc2`，并从该 tag 重新跑 fresh release 演练。
 
 ## 50% 到 60%：v0.10 Production App Kit
 
@@ -641,8 +664,8 @@ v1.0 兼容承诺：
 
 ### 工具链风险
 
-- formatter 还不能保留注释。
-- LSP 仍是 preview，复杂项目性能和语义能力不足。
+- formatter 已支持常见 `//` comment 保留，但还不是完整 trivia engine，复杂嵌套注释布局仍需更多 fixture。
+- LSP 仍是 preview，复杂项目性能、增量分析和语义能力不足。
 - source map 是 best-effort，不是完整调试器级映射。
 - cache 机制需要更多跨平台和大项目验证。
 
@@ -656,27 +679,27 @@ v1.0 兼容承诺：
 ### 生态风险
 
 - 还没有正式包发布。
-- 还没有文档站。
+- 只有 Markdown 文档站骨架，还没有 hosted docs。
 - VS Code extension 未发布 marketplace。
 - 还没有外部用户反馈。
 - 还没有真实长期项目验证。
 
 ## 下一步推荐
 
-最推荐的下一阶段是 v0.9 DX Stabilization，而不是继续扩语法。
+最推荐的下一阶段是 v0.10 Production App Kit，但在进入 v0.10 前应先决定是否打 `v0.9.0-rc2`。
 
 优先级：
 
-1. comment-preserving formatter。
-2. LSP hover、definition、diagnostics polish。
-3. `doctor --json`。
-4. compatibility fixtures。
-5. 文档站骨架。
+1. 如需发布候选，从当前 HEAD 打 `v0.9.0-rc2`，重新执行 fresh tag release 演练。
+2. v0.10 开始前，冻结 v0.9 的 compatibility fixtures，作为后续回归基线。
+3. 设计 migration plan 输出，不自动改数据库。
+4. 设计 Postgres 最小集成边界，避免把 SL 变成大而全 ORM。
+5. 基于 gallery 反馈梳理 route、command、store ergonomics 的高频痛点。
 
-v0.9 的成功标准：
+v0.10 的成功标准：
 
-- 开发者能放心运行 `slc fmt`，注释不会丢。
-- VS Code 体验足够稳定，适合公开试用。
-- CI 可以消费 `slc doctor --json`。
-- v0.6 到 v0.8 的旧示例继续通过。
-- 文档明确告诉用户哪些能力稳定，哪些仍实验。
+- 至少一个更接近生产的后端样板使用 typed config、DB、auth helper、schema doctor 和 tests。
+- Postgres 或 migration plan 至少完成一个，不同时硬上两个高风险方向。
+- v0.6 到 v0.9 compatibility fixtures 继续通过。
+- `slc doctor` 和 release check 能覆盖新生产能力的失败路径。
+- 文档明确告诉用户哪些能力可试用，哪些仍是实验性能力。
