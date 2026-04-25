@@ -229,7 +229,11 @@ class Parser:
         location = self.previous().location
         name = self.expect_ident("Expected store name.")
         self.expect_symbol(":")
-        return StoreDecl(name, self.parse_type_ref(), location)
+        type_ref = self.parse_type_ref()
+        backend = "sqlite"
+        if self.match_keyword("using"):
+            backend = self.expect_ident("Expected store backend name.")
+        return StoreDecl(name, type_ref, location, backend)
 
     def parse_config_decl(self) -> ConfigDecl:
         location = self.previous().location

@@ -1,0 +1,40 @@
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /projects
+# sl: route POST /projects
+# sl: route GET /tasks
+# sl: route POST /tasks
+# sl: command create_project
+# sl: command add_task
+# sl: command list_projects
+
+metadata:
+  name: "project-ops-api"
+  title: "Project Ops API"
+  owner: "symboliclight"
+
+task:
+  goal: "Validate SL against a project operations API with typed config, stores, explicit auth, routes, commands, and audit events."
+  audience:
+    - "Application developer"
+  priority: "medium"
+
+permissions:
+  web: true
+  filesystem:
+    read: true
+    write: true
+  network: false
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 500
+  sections:
+    - "Run"
+
+tests:
+  - name: "Project ops smoke"
+    assert:
+      - type: "required_sections"

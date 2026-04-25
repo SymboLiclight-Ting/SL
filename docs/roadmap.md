@@ -140,14 +140,31 @@ Deferred to later releases:
 - hosted documentation publishing,
 - PyPI release automation.
 
-## v0.10 Candidate Direction
+## v0.10 Production App Kit
+
+Implemented in the current mainline:
+
+- explicit store backend clauses with `using sqlite` and `using postgres`,
+- optional Postgres runtime dependency through `symboliclight[postgres]`,
+- read-only `slc migrate plan` text and JSON output,
+- Postgres-aware generated CRUD helpers and schema inspection,
+- Project Ops API gallery example with SQLite fallback and Postgres codegen coverage.
+
+Deferred to later releases:
+
+- automatic migration execution,
+- generated destructive SQL,
+- auth middleware and session management,
+- full ORM-style query builder.
+
+## v0.11 Candidate Direction
 
 Likely next work:
 
-- richer migration planning without automatic data mutation,
-- route and command ergonomics based on real app feedback,
 - hosted docs preview,
-- package publishing rehearsal when the project owner is ready.
+- package publishing rehearsal when the project owner is ready,
+- richer route and command ergonomics based on external feedback,
+- semantic-token and refactor support for editor tooling.
 
 ## v1.0 Stable
 

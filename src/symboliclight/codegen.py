@@ -85,12 +85,24 @@ class PythonGenerator:
             "            return",
             "",
             "CONN = None",
+            f"SL_DB_BACKEND = {self.app_backend()!r}",
             "",
             "def connect(db_path=None):",
             "    global CONN",
-            "    path = db_path or os.environ.get('SL_DB', 'symboliclight.sqlite')",
-            "    CONN = sqlite3.connect(path)",
-            "    CONN.row_factory = sqlite3.Row",
+            "    if SL_DB_BACKEND == 'postgres':",
+            "        try:",
+            "            import psycopg",
+            "            from psycopg.rows import dict_row",
+            "        except ImportError as exc:",
+            "            raise RuntimeError('Postgres apps require installing symboliclight[postgres].') from exc",
+            "        url = db_path or os.environ.get('SL_DB_URL')",
+            "        if not url:",
+            "            raise RuntimeError('Postgres apps require SL_DB_URL or an explicit db path/url.')",
+            "        CONN = psycopg.connect(url, row_factory=dict_row)",
+            "    else:",
+            "        path = db_path or os.environ.get('SL_DB', 'symboliclight.sqlite')",
+            "        CONN = sqlite3.connect(path)",
+            "        CONN.row_factory = sqlite3.Row",
             "    init_db()",
             "    return CONN",
             "",
@@ -171,11 +183,12 @@ class PythonGenerator:
 
     def emit_init_db(self) -> list[str]:
         lines = ["def init_db():", "    database = conn()"]
+        placeholder = self.sql_placeholder()
         lines.extend([
             "    database.execute('CREATE TABLE IF NOT EXISTS sl_migrations (version INTEGER PRIMARY KEY, schema_hash TEXT NOT NULL)')",
-            "    row = database.execute('SELECT schema_hash FROM sl_migrations WHERE version = ?', [SL_SCHEMA_VERSION]).fetchone()",
+            f"    row = database.execute('SELECT schema_hash FROM sl_migrations WHERE version = {placeholder}', [SL_SCHEMA_VERSION]).fetchone()",
             "    if row is None:",
-            "        database.execute('INSERT INTO sl_migrations (version, schema_hash) VALUES (?, ?)', [SL_SCHEMA_VERSION, SL_SCHEMA_HASH])",
+            f"        database.execute('INSERT INTO sl_migrations (version, schema_hash) VALUES ({placeholder}, {placeholder})', [SL_SCHEMA_VERSION, SL_SCHEMA_HASH])",
             "    elif row['schema_hash'] != SL_SCHEMA_HASH:",
             "        print('warning: SymbolicLight schema drift detected; automatic migrations are not implemented', file=sys.stderr)",
         ])
@@ -186,14 +199,15 @@ class PythonGenerator:
             columns = []
             for field in type_decl.fields:
                 if field.name == "id":
-                    columns.append(f"{self.sqlite_identifier(field.name)} INTEGER PRIMARY KEY AUTOINCREMENT")
+                    id_type = "INTEGER PRIMARY KEY AUTOINCREMENT" if store.backend == "sqlite" else "BIGSERIAL PRIMARY KEY"
+                    columns.append(f"{self.sql_identifier(field.name)} {id_type}")
                 else:
-                    columns.append(f"{self.sqlite_identifier(field.name)} {self.sqlite_type(field.type_ref)}")
-            sql = f"CREATE TABLE IF NOT EXISTS {self.sqlite_identifier(store.name)} ({', '.join(columns)})"
+                    columns.append(f"{self.sql_identifier(field.name)} {self.sql_type(field.type_ref, backend=store.backend)}")
+            sql = f"CREATE TABLE IF NOT EXISTS {self.sql_identifier(store.name)} ({', '.join(columns)})"
             lines.append(f"    database.execute({sql!r})")
         lines.extend(["    database.commit()", ""])
         for store in self.app.stores:
-            lines.extend(self.emit_store_helpers(store.name, self.type_decl(store.type_ref.name)))
+            lines.extend(self.emit_store_helpers(store.name, self.type_decl(store.type_ref.name), backend=store.backend))
         return lines
 
     def emit_configs(self) -> list[str]:
@@ -206,16 +220,17 @@ class PythonGenerator:
             lines.append("")
         return lines
 
-    def emit_store_helpers(self, store_name: str, type_decl: TypeDecl) -> list[str]:
+    def emit_store_helpers(self, store_name: str, type_decl: TypeDecl, *, backend: str) -> list[str]:
         data_fields = [field for field in type_decl.fields if field.name != "id"]
-        table = self.sqlite_identifier(store_name)
-        id_column = self.sqlite_identifier("id")
-        columns = ", ".join(self.sqlite_identifier(field.name) for field in data_fields)
-        placeholders = ", ".join("?" for _ in data_fields)
+        table = self.sql_identifier(store_name)
+        id_column = self.sql_identifier("id")
+        placeholder = self.sql_placeholder(backend)
+        columns = ", ".join(self.sql_identifier(field.name) for field in data_fields)
+        placeholders = ", ".join(placeholder for _ in data_fields)
         values = ", ".join(f"item.get({field.name!r})" for field in data_fields)
-        updates = ", ".join(f"{self.sqlite_identifier(field.name)} = ?" for field in data_fields)
+        updates = ", ".join(f"{self.sql_identifier(field.name)} = {placeholder}" for field in data_fields)
         filter_columns = {
-            field.name: self.sqlite_identifier(field.name)
+            field.name: self.sql_identifier(field.name)
             for field in type_decl.fields
         }
         lines = [
@@ -235,21 +250,19 @@ class PythonGenerator:
         )
         lines.extend([
             f"def {store_name}_insert(item):",
-            f"    cursor = conn().execute('INSERT INTO {table} ({columns}) VALUES ({placeholders})', [{values}])",
-            "    conn().commit()",
-            f"    return {store_name}_get(cursor.lastrowid)",
+            *self.emit_insert_lines(store_name, table, columns, placeholders, values, backend=backend),
             "",
             f"def {store_name}_all():",
             f"    rows = conn().execute('SELECT * FROM {table} ORDER BY {id_column}').fetchall()",
             f"    return [{store_name}_normalize(dict(row)) for row in rows]",
             "",
             f"def {store_name}_get(item_id):",
-            f"    row = conn().execute('SELECT * FROM {table} WHERE {id_column} = ?', [item_id]).fetchone()",
+            f"    row = conn().execute('SELECT * FROM {table} WHERE {id_column} = {placeholder}', [item_id]).fetchone()",
             f"    return {store_name}_normalize(dict(row)) if row else None",
             "",
             f"def {store_name}_update(item_id, item):",
             "    item = dict(item)",
-            f"    cursor = conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = ?', [{values}, item_id])",
+            f"    cursor = conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = {placeholder}', [{values}, item_id])",
             "    if cursor.rowcount == 0:",
             f"        raise KeyError(f'{store_name}.update id not found: {{item_id}}')",
             "    conn().commit()",
@@ -257,14 +270,14 @@ class PythonGenerator:
             "",
             f"def {store_name}_try_update(item_id, item):",
             "    item = dict(item)",
-            f"    cursor = conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = ?', [{values}, item_id])",
+            f"    cursor = conn().execute('UPDATE {table} SET {updates} WHERE {id_column} = {placeholder}', [{values}, item_id])",
             "    conn().commit()",
             "    if cursor.rowcount == 0:",
             "        return None",
             f"    return {store_name}_get(item_id)",
             "",
             f"def {store_name}_delete(item_id):",
-            f"    cursor = conn().execute('DELETE FROM {table} WHERE {id_column} = ?', [item_id])",
+            f"    cursor = conn().execute('DELETE FROM {table} WHERE {id_column} = {placeholder}', [item_id])",
             "    conn().commit()",
             "    return cursor.rowcount > 0",
             "",
@@ -276,7 +289,7 @@ class PythonGenerator:
             "            raise ValueError(f'unknown filter field: {key}')",
             "    if not criteria:",
             f"        return {store_name}_all()",
-            "    where = ' AND '.join(f'{columns[key]} = ?' for key in criteria)",
+            f"    where = ' AND '.join(f'{{columns[key]}} = {placeholder}' for key in criteria)",
             f"    rows = conn().execute('SELECT * FROM {table} WHERE ' + where + ' ORDER BY {id_column}', list(criteria.values())).fetchall()",
             f"    return [{store_name}_normalize(dict(row)) for row in rows]",
             "",
@@ -285,7 +298,7 @@ class PythonGenerator:
             "    return int(row['count'])",
             "",
             f"def {store_name}_exists(item_id):",
-            f"    row = conn().execute('SELECT 1 FROM {table} WHERE {id_column} = ?', [item_id]).fetchone()",
+            f"    row = conn().execute('SELECT 1 FROM {table} WHERE {id_column} = {placeholder}', [item_id]).fetchone()",
             "    return row is not None",
             "",
             f"def {store_name}_clear():",
@@ -295,6 +308,29 @@ class PythonGenerator:
             "",
         ])
         return lines
+
+    def emit_insert_lines(
+        self,
+        store_name: str,
+        table: str,
+        columns: str,
+        placeholders: str,
+        values: str,
+        *,
+        backend: str,
+    ) -> list[str]:
+        if backend == "postgres":
+            return [
+                f"    cursor = conn().execute('INSERT INTO {table} ({columns}) VALUES ({placeholders}) RETURNING {self.sql_identifier('id')}', [{values}])",
+                "    row = cursor.fetchone()",
+                "    conn().commit()",
+                f"    return {store_name}_get(row['id'])",
+            ]
+        return [
+            f"    cursor = conn().execute('INSERT INTO {table} ({columns}) VALUES ({placeholders})', [{values}])",
+            "    conn().commit()",
+            f"    return {store_name}_get(cursor.lastrowid)",
+        ]
 
     def emit_fixtures(self) -> list[str]:
         lines = ["def load_fixtures():"]
@@ -613,17 +649,46 @@ class PythonGenerator:
             return rendered
         return f"{arg.name}={rendered}"
 
+    def app_backend(self) -> str:
+        backends = {store.backend for store in self.app.stores}
+        return next(iter(backends)) if backends else "sqlite"
+
+    def sql_placeholder(self, backend: str | None = None) -> str:
+        return "%s" if (backend or self.app_backend()) == "postgres" else "?"
+
+    def sql_type(self, type_ref: TypeRef, *, backend: str | None = None) -> str:
+        backend = backend or self.app_backend()
+        if backend == "postgres":
+            return self.postgres_type(type_ref)
+        return self.sqlite_type(type_ref)
+
     def sqlite_type(self, type_ref: TypeRef) -> str:
         if type_ref.name == "Option" and type_ref.args:
             return self.sqlite_type(type_ref.args[0])
         if type_ref.name == "Bool" or type_ref.name == "Int" or type_ref.name == "Id":
             return "INTEGER"
-        if type_ref.name == "Float":
+        if type_ref.name in {"Float", "Money"}:
             return "REAL"
         return "TEXT"
 
-    def sqlite_identifier(self, name: str) -> str:
+    def postgres_type(self, type_ref: TypeRef) -> str:
+        if type_ref.name == "Option" and type_ref.args:
+            return self.postgres_type(type_ref.args[0])
+        if type_ref.name == "Bool":
+            return "BOOLEAN"
+        if type_ref.name == "Float":
+            return "DOUBLE PRECISION"
+        if type_ref.name == "Money":
+            return "NUMERIC"
+        if type_ref.name == "Int" or type_ref.name == "Id":
+            return "INTEGER"
+        return "TEXT"
+
+    def sql_identifier(self, name: str) -> str:
         return '"' + name.replace('"', '""') + '"'
+
+    def sqlite_identifier(self, name: str) -> str:
+        return self.sql_identifier(name)
 
     def required_body_fields(self, route: RouteDecl) -> list[str]:
         if route.body_type is None:
@@ -640,6 +705,7 @@ class PythonGenerator:
         for store in self.app.stores:
             type_decl = self.type_decl(store.type_ref.name)
             digest.update(store.name.encode("utf-8"))
+            digest.update(store.backend.encode("utf-8"))
             for field in type_decl.fields:
                 digest.update(field.name.encode("utf-8"))
                 digest.update(field.type_ref.render().encode("utf-8"))

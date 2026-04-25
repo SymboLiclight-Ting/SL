@@ -124,3 +124,23 @@ app Notes {
     assert app.fixtures[0].store_name == "notes"
     assert app.configs[0].name == "AppConfig"
     assert app.tests[0].golden_path == "./golden/notes.json"
+
+
+def test_parser_accepts_store_backend_clause() -> None:
+    source = """
+app BackendDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store sqlite_items: Item using sqlite
+  store postgres_items: Item using postgres
+}
+"""
+
+    app = parse_source(source, path="backend.sl")
+
+    assert isinstance(app, App)
+    assert app.stores[0].backend == "sqlite"
+    assert app.stores[1].backend == "postgres"

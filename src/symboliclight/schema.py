@@ -104,6 +104,8 @@ def type_schema(type_ref: TypeRef | None, *, enum_names: set[str]) -> dict[str, 
         return {"type": "integer"}
     if type_ref.name == "Float":
         return {"type": "number"}
+    if type_ref.name == "Money":
+        return {"type": "number"}
     if type_ref.name == "Text":
         return {"type": "string"}
     if type_ref.name == "List" and type_ref.args:

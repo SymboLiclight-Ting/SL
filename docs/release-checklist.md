@@ -12,6 +12,10 @@
 - Run gallery `slc check/build/test/schema/doctor` smoke checks.
 - Run `slc doctor examples/gallery/small-admin-backend/app.sl --db build/small-admin-backend.sqlite`.
 - Run `slc doctor examples/gallery/small-admin-backend/app.sl --db build/small-admin-backend.sqlite --json`.
+- Run `slc migrate plan examples/gallery/project-ops-api/app.sl --db build/project_ops.sqlite`.
+- Run `slc check examples/gallery/project-ops-api/app_postgres.sl`.
+- Run `slc build examples/gallery/project-ops-api/app_postgres.sl --out build/project_ops_postgres.py`.
+- Run `python -m py_compile build/project_ops_postgres.py`.
 - Run `python scripts/compat_check.py`.
 - Run generated CLI add/list commands with a temporary SQLite database.
 - Confirm README quick start matches actual CLI behavior.
@@ -20,5 +24,5 @@
 - Run `python -m build`.
 - Run `python scripts/package_smoke.py --gallery`.
 - Run `python scripts/release_check.py` for the full package-inclusive release gate.
-- For release candidates, build with a PEP 440 pre-release version such as `0.9.0rc1`.
+- For release candidates, build with a PEP 440 pre-release version such as `0.10.0rc1`.
 - Upload only when the project owner explicitly chooses TestPyPI or PyPI publishing.

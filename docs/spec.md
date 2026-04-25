@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.9
+# SymbolicLight Language Specification v0.10
 
-This document defines SymbolicLight v0.9 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.10 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -18,7 +18,7 @@ An `app` is executable and can be built, run, tested, and served. A `module` is 
 ## Keywords
 
 ```text
-app module import as intent permissions from enum type config fn store fixture route body command test golden let return assert if else true false
+app module import as intent permissions from using enum type config fn store fixture route body command test golden let return assert if else true false
 ```
 
 ## Imports
@@ -52,7 +52,7 @@ When an app declares `test from intent.acceptance`, `slc test` runs a v0.6 offli
 Built-in scalar types:
 
 ```text
-Bool Int Float Text
+Bool Int Float Text Money
 ```
 
 Built-in generic types:
@@ -90,9 +90,11 @@ Enum variants are referenced with `Status.open` or an imported path such as `mod
 
 ```sl
 store todos: Todo
+store todos: Todo using sqlite
+store todos: Todo using postgres
 ```
 
-Stores are backed by SQLite in v0.4. Supported methods:
+Stores default to SQLite. v0.10 adds an explicit `using sqlite` or `using postgres` backend clause. One app may use only one store backend. Postgres support requires installing `symboliclight[postgres]`; default installation remains dependency-light. Supported methods:
 
 ```text
 todos.insert(record) -> Todo
@@ -119,7 +121,7 @@ todos.clear() -> Int
 
 `clear()` is test-only in v0.4.
 
-Generated Python includes schema metadata and records a schema hash in `sl_migrations`. v0.8 detects schema drift and prints a warning at startup; it does not perform automatic data migrations and does not overwrite stored drift metadata unless the database is first initialized.
+Generated Python includes schema metadata and records a schema hash in `sl_migrations`. v0.10 detects schema drift and prints a warning at startup; it does not perform automatic data migrations and does not overwrite stored drift metadata unless the database is first initialized.
 
 ### `config`
 
@@ -273,6 +275,8 @@ slc doctor <path>
 slc doctor <path> --json
 slc doctor <path> --db path/to/app.sqlite
 slc doctor <path> --db path/to/app.sqlite --json
+slc migrate plan <path> --db path-or-url
+slc migrate plan <path> --db path-or-url --json
 slc lsp
 slc init <dir>
 slc new api <name>
@@ -300,9 +304,11 @@ These hints avoid adding nonstandard top-level fields to IntentSpec while still 
 
 The same hints are used by `slc test` when `test from intent.acceptance` is declared. Missing hinted routes or commands fail offline acceptance. Extra routes or commands are reported as warnings.
 
-`slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and the actual SQLite table structure. `schema drift: up to date` means the stored hash matches the generated hash. `schema diff: no structural difference detected` means the actual SQLite structure also matches. If the hash matches but the structure differs, doctor reports `schema drift: structural drift detected`. If the hash differs, doctor reports `schema drift: drift detected` and still includes summary schema differences. Diff lines use stable release-facing forms: `missing table`, `extra table`, `missing column`, `extra column`, and `type mismatch`. The command never mutates the database and does not perform automatic migrations.
+`slc doctor --db` inspects a SQLite database path or Postgres URL. It reads `sl_migrations` metadata and the actual table structure. `schema drift: up to date` means the stored hash matches the generated hash. `schema diff: no structural difference detected` means the actual structure also matches. If the hash matches but the structure differs, doctor reports `schema drift: structural drift detected`. If the hash differs, doctor reports `schema drift: drift detected` and still includes summary schema differences. Diff lines use stable release-facing forms: `missing table`, `extra table`, `missing column`, `extra column`, and `type mismatch`. The command never mutates the database and does not perform automatic migrations.
 
 `slc doctor --json` emits a machine-readable report with `source`, `unit`, `diagnostics`, `summary`, `intent`, `schema`, `cache`, and `source_map`. `schema.drift` uses stable enum values: `not_checked`, `not_initialized`, `up_to_date`, `structural_drift`, `hash_drift`, and `unable_to_inspect`. `schema.diff` is an array of objects with `kind` values such as `missing_table`, `extra_table`, `missing_column`, `extra_column`, and `type_mismatch`.
+
+`slc migrate plan <file.sl> --db path-or-url` emits a read-only migration plan using the same schema diff model. `--json` returns a machine-readable object with `status`, `backend`, `database`, and `items`. v0.10 never executes migration SQL.
 
 ## Generated Python Contract
 
@@ -312,6 +318,8 @@ The compiler emits one Python 3.11 file using standard library modules first:
 - `sqlite3`
 - `http.server`
 - `json`
+
+Postgres apps import `psycopg` lazily at runtime and require the optional `symboliclight[postgres]` install extra.
 
 Generated code includes `# source: file.sl:line` comments for major functions, routes, and tests. `slc build` also emits a sidecar source map by default:
 

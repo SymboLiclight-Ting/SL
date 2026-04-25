@@ -52,6 +52,7 @@ class StoreDecl:
     name: str
     type_ref: TypeRef
     location: SourceLocation
+    backend: str = "sqlite"
 
 
 @dataclass(slots=True)

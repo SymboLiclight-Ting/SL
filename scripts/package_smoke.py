@@ -69,6 +69,13 @@ def run_gallery_smoke(slc: Path, temp: Path) -> None:
         run([str(slc), "test", str(app)], isolated=True)
         run([str(slc), "schema", str(app), "--out", str(schema_out)], isolated=True)
         run([str(slc), "doctor", str(app)], isolated=True)
+        postgres_app = app.parent / "app_postgres.sl"
+        if postgres_app.exists():
+            postgres_out = workspace / f"{stem}_postgres.py"
+            run([str(slc), "check", str(postgres_app)], isolated=True)
+            run([str(slc), "build", str(postgres_app), "--out", str(postgres_out)], isolated=True)
+            run([sys.executable, "-m", "py_compile", str(postgres_out)], isolated=True)
+            run([str(slc), "migrate", "plan", str(postgres_app), "--db", "postgresql://localhost/symboliclight"], isolated=True)
 
 
 def run(command: list[str], *, isolated: bool = False) -> None:

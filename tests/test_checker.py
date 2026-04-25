@@ -38,6 +38,58 @@ app Bad {
     assert any("Unknown type `Missing`" in diagnostic.message for diagnostic in diagnostics)
 
 
+def test_checker_accepts_explicit_store_backends() -> None:
+    source = """
+app BackendDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item using postgres
+}
+"""
+    app = parse_source(source, path="backend.sl")
+    diagnostics = check_program(app, source_path=Path("backend.sl"))
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+
+
+def test_checker_rejects_unknown_store_backend() -> None:
+    source = """
+app BadBackend {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item using mysql
+}
+"""
+    app = parse_source(source, path="bad_backend.sl")
+    diagnostics = check_program(app, source_path=Path("bad_backend.sl"))
+
+    assert any("Unsupported store backend `mysql`" in diagnostic.message for diagnostic in diagnostics)
+
+
+def test_checker_rejects_mixed_store_backends() -> None:
+    source = """
+app MixedBackend {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store sqlite_items: Item using sqlite
+  store postgres_items: Item using postgres
+}
+"""
+    app = parse_source(source, path="mixed_backend.sl")
+    diagnostics = check_program(app, source_path=Path("mixed_backend.sl"))
+
+    assert any("mixes store backends" in diagnostic.message for diagnostic in diagnostics)
+
+
 def test_checker_rejects_missing_intent() -> None:
     source = """
 app Bad {

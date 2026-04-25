@@ -19,7 +19,7 @@ Use SymbolicLight in project, website, release, and positioning text. Use SL in 
 
 ## Current MVP
 
-The v0.9 developer preview supports:
+The v0.10 developer preview supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -28,7 +28,7 @@ The v0.9 developer preview supports:
 - `enum` declarations and `type` record declarations.
 - pure `fn` declarations inside modules and apps.
 - `Option<T>` and `Result<T, E>` type references.
-- `store` declarations backed by SQLite.
+- `store` declarations backed by SQLite or optional Postgres.
 - `command` handlers compiled to CLI subcommands.
 - `route GET/POST/PUT/PATCH/DELETE` handlers compiled to JSON HTTP routes.
 - typed route bodies and `Response<T>` status responses.
@@ -42,6 +42,7 @@ The v0.9 developer preview supports:
 - incremental `slc check` cache reuse.
 - JSON diagnostics for tools through `slc check --json`.
 - machine-readable doctor reports through `slc doctor --json`.
+- read-only migration plans through `slc migrate plan`.
 - developer-preview LSP through `slc lsp`.
 - local VS Code syntax, snippets, and language-server wiring under `editors/vscode`.
 - local playground under `playground/`.
@@ -49,6 +50,7 @@ The v0.9 developer preview supports:
 - IntentSpec acceptance checks through `slc test` for apps that declare `test from intent.acceptance`.
 - route auth checks through the minimal `request.header(...)` helper.
 - schema drift inspection through `slc doctor --db`.
+- optional Postgres runtime support through `symboliclight[postgres]`.
 - comment-preserving formatting for common `//` comment positions.
 - repeatable release smoke checks through `scripts/release_check.py`.
 
@@ -65,6 +67,8 @@ slc doctor examples/todo_app.sl
 slc doctor examples/todo_app.sl --json
 slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite
 slc doctor examples/gallery/small-admin-backend/app.sl --db build/admin.sqlite --json
+slc migrate plan examples/gallery/project-ops-api/app.sl --db build/project_ops.sqlite
+slc check examples/gallery/project-ops-api/app_postgres.sl
 slc lsp
 python build/todo_app.py test
 python build/todo_app.py add "Buy milk"
@@ -72,7 +76,7 @@ python build/todo_app.py list
 python build/todo_app.py serve
 ```
 
-The generated app uses only the Python standard library: `argparse`, `sqlite3`, `http.server`, and `json`.
+SQLite generated apps use only the Python standard library: `argparse`, `sqlite3`, `http.server`, and `json`. Postgres generated apps require installing `symboliclight[postgres]`.
 
 ## Example
 
@@ -190,7 +194,7 @@ python scripts/package_smoke.py --gallery
 python scripts/release_check.py
 ```
 
-For a local `v0.9.0-rc2` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
+For a local `v0.10.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
 
 ## Project Status
 

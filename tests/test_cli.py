@@ -369,6 +369,63 @@ app DriftDemo {
     assert stored == "old"
 
 
+def test_cli_migrate_plan_reports_schema_diff_text_and_json(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "app.sl"
+    db_path = tmp_path / "app.sqlite"
+    source.write_text(
+        """
+app MigrateDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+    done: Bool,
+  }
+
+  store items: Item
+}
+""",
+        encoding="utf-8",
+    )
+    database = sqlite3.connect(db_path)
+    try:
+        database.execute("CREATE TABLE items (id INTEGER, title TEXT, extra TEXT)")
+        database.commit()
+    finally:
+        database.close()
+
+    assert main(["migrate", "plan", str(source), "--db", str(db_path)]) == 0
+    text = capsys.readouterr().out
+    assert "SymbolicLight migration plan" in text
+    assert "plan: missing column items.done" in text
+    assert "plan: extra column items.extra" in text
+
+    assert main(["migrate", "plan", str(source), "--db", str(db_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "changes_required"
+    assert {item["kind"] for item in payload["items"]} >= {"missing_column", "extra_column"}
+
+
+def test_cli_migrate_plan_reports_postgres_optional_dependency(tmp_path: Path, capsys) -> None:
+    source = """
+app PgMigrate {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+
+  store items: Item using postgres
+}
+"""
+    path = tmp_path / "pg_migrate.sl"
+    path.write_text(source, encoding="utf-8")
+
+    assert main(["migrate", "plan", str(path), "--db", "postgresql://localhost/symboliclight_missing"]) == 0
+    text = capsys.readouterr().out
+
+    assert "backend: postgres" in text
+    assert "status: unable_to_inspect" in text
+
+
 def test_cli_doctor_reports_structural_drift_when_hash_matches(tmp_path: Path, capsys) -> None:
     source = tmp_path / "app.sl"
     db_path = tmp_path / "app.sqlite"

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.10.0rc1
+
+- Added explicit store backend clauses with `using sqlite` and `using postgres`.
+- Added optional Postgres runtime support through `symboliclight[postgres]`.
+- Added read-only `slc migrate plan` text and JSON output.
+- Extended generated CRUD helpers and schema inspection for Postgres-backed apps.
+- Added the Project Ops API gallery example with SQLite fallback and Postgres codegen coverage.
+- Updated release smoke checks to include migration-plan and Project Ops API coverage.
+
 ## v0.9.0rc2
 
 - Aligned the release candidate package version with the `v0.9.0-rc2` tag.

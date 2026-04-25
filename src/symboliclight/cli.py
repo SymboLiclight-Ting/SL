@@ -59,6 +59,13 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.add_argument("--db")
     doctor_parser.add_argument("--json", action="store_true")
 
+    migrate_parser = sub.add_parser("migrate")
+    migrate_sub = migrate_parser.add_subparsers(dest="migrate_kind", required=True)
+    migrate_plan = migrate_sub.add_parser("plan")
+    migrate_plan.add_argument("source")
+    migrate_plan.add_argument("--db", required=True)
+    migrate_plan.add_argument("--json", action="store_true")
+
     sub.add_parser("lsp")
 
     init_parser = sub.add_parser("init")
@@ -163,15 +170,27 @@ def main(argv: list[str] | None = None) -> int:
                             diagnostics,
                             Path(args.source),
                             cache_hit=cache_hit,
-                            db_path=Path(args.db) if args.db else None,
+                            db_ref=args.db,
                         ),
                         indent=2,
                     )
                 )
             else:
                 print_diagnostics(diagnostics)
-                print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit, db_path=Path(args.db) if args.db else None))
+                print(doctor_report(unit, diagnostics, Path(args.source), cache_hit=cache_hit, db_ref=args.db))
             return 1 if any(diagnostic.severity == "error" for diagnostic in diagnostics) else 0
+        if args.command == "migrate" and args.migrate_kind == "plan":
+            app, diagnostics, _ = load_checked_app(Path(args.source), strict_intent=False, use_cache=False)
+            if not args.json:
+                print_diagnostics(diagnostics)
+            raise_if_errors(diagnostics)
+            plan = migration_plan_report(app, args.db)
+            plan["diagnostics"] = [diagnostic.to_dict() for diagnostic in diagnostics]
+            if args.json:
+                print(json.dumps(plan, indent=2))
+            else:
+                print(render_migration_plan(plan))
+            return 0
         if args.command == "lsp":
             run_lsp_server()
             return 0
@@ -276,7 +295,7 @@ def doctor_report(
     source_path: Path,
     *,
     cache_hit: bool,
-    db_path: Path | None = None,
+    db_ref: str | None = None,
 ) -> str:
     lines = ["SymbolicLight doctor"]
     lines.append(f"- source: {source_path}")
@@ -299,10 +318,10 @@ def doctor_report(
         if untyped_mutating:
             rendered = ", ".join(f"{route.method} {route.path}" for route in untyped_mutating)
             lines.append(f"- route body warning: missing typed body for {rendered}")
-        if db_path is None:
+        if db_ref is None:
             lines.append("- schema drift: checked by generated Python at startup")
         else:
-            lines.extend(schema_drift_lines(unit, db_path))
+            lines.extend(schema_drift_lines(unit, db_ref))
         if any(test.external_ref == "intent.acceptance" for test in unit.tests):
             lines.append("- intent acceptance: declared")
         elif unit.intents:
@@ -330,7 +349,7 @@ def doctor_report_json(
     source_path: Path,
     *,
     cache_hit: bool,
-    db_path: Path | None = None,
+    db_ref: str | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "source": str(source_path),
@@ -350,8 +369,8 @@ def doctor_report_json(
         }
         payload["schema"] = (
             {"drift": "not_checked", "database": None, "diff": []}
-            if db_path is None
-            else schema_drift_info(unit, db_path)
+            if db_ref is None
+            else schema_drift_info(unit, db_ref)
         )
         payload["intent"] = intent_doctor_json(unit, source_path)
     else:
@@ -378,35 +397,40 @@ def doctor_error_report_json(source_path: Path, diagnostics: list[Diagnostic]) -
     }
 
 
-def schema_drift_lines(app: App, db_path: Path) -> list[str]:
-    info = schema_drift_info(app, db_path)
+def schema_drift_lines(app: App, db_ref: str) -> list[str]:
+    info = schema_drift_info(app, db_ref)
     drift = str(info["drift"])
     if drift == "not_initialized":
-        return [f"- schema drift: not initialized ({db_path})"]
+        return [f"- schema drift: not initialized ({db_ref})"]
     if drift == "up_to_date":
         return [
-            f"- schema drift: up to date ({db_path})",
+            f"- schema drift: up to date ({db_ref})",
             "- schema diff: no structural difference detected",
         ]
     if drift == "structural_drift":
         return [
-            f"- schema drift: structural drift detected ({db_path})",
+            f"- schema drift: structural drift detected ({db_ref})",
             *[render_schema_diff_item(item) for item in info["diff"] if isinstance(item, dict)],
             "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
         ]
     if drift == "hash_drift":
         return [
-            f"- schema drift: drift detected ({db_path})",
+            f"- schema drift: drift detected ({db_ref})",
             *[render_schema_diff_item(item) for item in info["diff"] if isinstance(item, dict)],
             "- schema drift suggestion: back up the database, export data, then rebuild or migrate the schema manually.",
         ]
     return [
-        f"- schema drift: unable to inspect ({db_path})",
+        f"- schema drift: unable to inspect ({db_ref})",
         f"- schema drift error: {info.get('error', '')}",
     ]
 
 
-def schema_drift_info(app: App, db_path: Path) -> dict[str, object]:
+def schema_drift_info(app: App, db_ref: str | Path) -> dict[str, object]:
+    db_text = str(db_ref)
+    backend = app_store_backend(app, db_text)
+    if backend == "postgres":
+        return postgres_schema_drift_info(app, db_text)
+    db_path = sqlite_db_path(db_text)
     if not db_path.exists():
         return {"drift": "not_initialized", "database": str(db_path), "diff": []}
     try:
@@ -426,7 +450,7 @@ def schema_drift_info(app: App, db_path: Path) -> dict[str, object]:
                 return {"drift": "not_initialized", "database": str(db_path), "diff": []}
             expected = generate_schema_hash(app)
             actual = str(row["schema_hash"])
-            diff = schema_diff_items(app, database)
+            diff = schema_diff_items(app, database, backend="sqlite")
             if actual == expected and not diff:
                 return {"drift": "up_to_date", "database": str(db_path), "diff": [], "expected_hash": expected, "actual_hash": actual}
             if actual == expected:
@@ -438,16 +462,205 @@ def schema_drift_info(app: App, db_path: Path) -> dict[str, object]:
         return {"drift": "unable_to_inspect", "database": str(db_path), "diff": [], "error": str(exc)}
 
 
+def postgres_schema_drift_info(app: App, db_url: str) -> dict[str, object]:
+    try:
+        actual_tables, actual_hash = inspect_postgres_database(db_url)
+    except ImportError:
+        return {
+            "drift": "unable_to_inspect",
+            "database": db_url,
+            "diff": [],
+            "error": "Postgres inspection requires installing symboliclight[postgres].",
+        }
+    except Exception as exc:
+        return {"drift": "unable_to_inspect", "database": db_url, "diff": [], "error": str(exc)}
+    if actual_hash is None:
+        return {"drift": "not_initialized", "database": db_url, "diff": []}
+    expected = generate_schema_hash(app)
+    diff = schema_diff_items_from_actual(app, actual_tables, backend="postgres")
+    if actual_hash == expected and not diff:
+        return {"drift": "up_to_date", "database": db_url, "diff": [], "expected_hash": expected, "actual_hash": actual_hash}
+    if actual_hash == expected:
+        return {"drift": "structural_drift", "database": db_url, "diff": diff, "expected_hash": expected, "actual_hash": actual_hash}
+    return {"drift": "hash_drift", "database": db_url, "diff": diff, "expected_hash": expected, "actual_hash": actual_hash}
+
+
+def inspect_postgres_database(db_url: str) -> tuple[dict[str, dict[str, str]], str | None]:
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+    except ImportError:
+        raise
+    with psycopg.connect(db_url, row_factory=dict_row) as database:
+        migration = database.execute(
+            """
+            SELECT EXISTS (
+              SELECT 1 FROM information_schema.tables
+              WHERE table_schema = 'public' AND table_name = 'sl_migrations'
+            ) AS exists
+            """
+        ).fetchone()
+        actual_hash = None
+        if migration and migration["exists"]:
+            row = database.execute(
+                "SELECT schema_hash FROM sl_migrations WHERE version = %s",
+                [1],
+            ).fetchone()
+            actual_hash = str(row["schema_hash"]) if row else None
+        rows = database.execute(
+            """
+            SELECT table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+            ORDER BY table_name, ordinal_position
+            """
+        ).fetchall()
+    schema: dict[str, dict[str, str]] = {}
+    for row in rows:
+        schema.setdefault(str(row["table_name"]), {})[str(row["column_name"])] = str(row["data_type"])
+    return schema, actual_hash
+
+
+def app_store_backend(app: App, db_ref: str | None = None) -> str:
+    backends = {store.backend for store in app.stores}
+    if "postgres" in backends:
+        return "postgres"
+    if db_ref and (db_ref.startswith("postgres://") or db_ref.startswith("postgresql://")):
+        return "postgres"
+    return "sqlite"
+
+
+def sqlite_db_path(db_ref: str) -> Path:
+    if db_ref.startswith("sqlite:///"):
+        return Path(db_ref.removeprefix("sqlite:///"))
+    return Path(db_ref)
+
+
+def migration_plan_report(app: App, db_ref: str) -> dict[str, object]:
+    backend = app_store_backend(app, db_ref)
+    if backend == "postgres":
+        try:
+            actual_tables, _ = inspect_postgres_database(db_ref)
+            diff = schema_diff_items_from_actual(app, actual_tables, backend="postgres")
+            status = "changes_required" if diff else "up_to_date"
+            error = None
+        except ImportError:
+            diff = []
+            status = "unable_to_inspect"
+            error = "Postgres migration planning requires installing symboliclight[postgres]."
+        except Exception as exc:
+            diff = []
+            status = "unable_to_inspect"
+            error = str(exc)
+        return {
+            "source": app.name,
+            "backend": "postgres",
+            "database": db_ref,
+            "status": status,
+            "items": [migration_plan_item(item) for item in diff],
+            "error": error,
+        }
+    db_path = sqlite_db_path(db_ref)
+    if not db_path.exists():
+        diff = [{"kind": "missing_table", "table": store.name} for store in app.stores]
+        return {
+            "source": app.name,
+            "backend": "sqlite",
+            "database": str(db_path),
+            "status": "not_initialized" if diff else "up_to_date",
+            "items": [migration_plan_item(item) for item in diff],
+            "error": None,
+        }
+    try:
+        database = sqlite3.connect(db_path)
+        database.row_factory = sqlite3.Row
+        try:
+            diff = schema_diff_items(app, database, backend="sqlite")
+        finally:
+            database.close()
+        return {
+            "source": app.name,
+            "backend": "sqlite",
+            "database": str(db_path),
+            "status": "changes_required" if diff else "up_to_date",
+            "items": [migration_plan_item(item) for item in diff],
+            "error": None,
+        }
+    except sqlite3.Error as exc:
+        return {
+            "source": app.name,
+            "backend": "sqlite",
+            "database": str(db_path),
+            "status": "unable_to_inspect",
+            "items": [],
+            "error": str(exc),
+        }
+
+
+def migration_plan_item(item: dict[str, object]) -> dict[str, object]:
+    kind = str(item.get("kind"))
+    table = item.get("table")
+    column = item.get("column")
+    suggestion = {
+        "missing_table": "Create the missing table after backing up production data.",
+        "extra_table": "Review the extra table manually; v0.10 does not generate DROP TABLE.",
+        "missing_column": "Add the missing column after choosing a safe default for existing rows.",
+        "extra_column": "Review the extra column manually; v0.10 does not generate DROP COLUMN.",
+        "type_mismatch": "Plan a manual data-safe type migration.",
+    }.get(kind, "Review the schema difference manually.")
+    return {
+        "kind": kind,
+        "table": table,
+        "column": column,
+        "expected": item.get("expected"),
+        "actual": item.get("actual"),
+        "suggestion": suggestion,
+    }
+
+
+def render_migration_plan(plan: dict[str, object]) -> str:
+    lines = [
+        "SymbolicLight migration plan",
+        f"- app: {plan.get('source')}",
+        f"- backend: {plan.get('backend')}",
+        f"- database: {plan.get('database')}",
+        f"- status: {plan.get('status')}",
+    ]
+    if plan.get("error"):
+        lines.append(f"- error: {plan.get('error')}")
+        return "\n".join(lines)
+    items = [item for item in plan.get("items", []) if isinstance(item, dict)]
+    if not items:
+        lines.append("- plan: no structural changes required")
+        return "\n".join(lines)
+    for item in items:
+        lines.append(render_migration_plan_item(item))
+    return "\n".join(lines)
+
+
+def render_migration_plan_item(item: dict[str, object]) -> str:
+    rendered = render_schema_diff_item(item).replace("- schema diff:", "- plan:")
+    return f"{rendered} ({item.get('suggestion')})"
+
+
 def schema_diff_lines(app: App, database: sqlite3.Connection) -> list[str]:
-    return [render_schema_diff_item(item) for item in schema_diff_items(app, database)]
+    return [render_schema_diff_item(item) for item in schema_diff_items(app, database, backend="sqlite")]
 
 
-def schema_diff_items(app: App, database: sqlite3.Connection) -> list[dict[str, object]]:
+def schema_diff_items(app: App, database: sqlite3.Connection, *, backend: str) -> list[dict[str, object]]:
+    return schema_diff_items_from_actual(app, actual_schema(database), backend=backend)
+
+
+def schema_diff_items_from_actual(
+    app: App,
+    actual_tables: dict[str, dict[str, str]],
+    *,
+    backend: str,
+) -> list[dict[str, object]]:
     expected_tables = {
-        store.name: expected_columns_for_store(app, store.type_ref)
+        store.name: expected_columns_for_store(app, store.type_ref, backend=backend)
         for store in app.stores
     }
-    actual_tables = actual_schema(database)
     ignored_tables = {"sl_migrations", "sqlite_sequence"}
     items: list[dict[str, object]] = []
     for table_name in sorted(expected_tables):
@@ -461,7 +674,7 @@ def schema_diff_items(app: App, database: sqlite3.Connection) -> list[dict[str, 
             actual_type = actual_columns.get(column_name)
             if actual_type is None:
                 items.append({"kind": "missing_column", "table": table_name, "column": column_name})
-            elif normalize_sqlite_type(actual_type) != normalize_sqlite_type(expected_type):
+            elif normalize_sql_type(actual_type, backend=backend) != normalize_sql_type(expected_type, backend=backend):
                 items.append(
                     {
                         "kind": "type_mismatch",
@@ -495,13 +708,16 @@ def render_schema_diff_item(item: dict[str, object]) -> str:
     return "- schema diff: unknown"
 
 
-def expected_columns_for_store(app: App, type_ref: TypeRef) -> dict[str, str]:
+def expected_columns_for_store(app: App, type_ref: TypeRef, *, backend: str) -> dict[str, str]:
     type_decl = type_decl_for_app(app, type_ref.name)
     if type_decl is None:
         return {}
     columns: dict[str, str] = {}
     for field in type_decl.fields:
-        columns[field.name] = "INTEGER" if field.name == "id" else sqlite_type_for_doctor(field.type_ref)
+        if field.name == "id":
+            columns[field.name] = "INTEGER" if backend == "sqlite" else "BIGINT"
+        else:
+            columns[field.name] = db_type_for_doctor(field.type_ref, backend=backend)
     return columns
 
 
@@ -530,16 +746,36 @@ def actual_schema(database: sqlite3.Connection) -> dict[str, dict[str, str]]:
 
 
 def sqlite_type_for_doctor(type_ref: TypeRef) -> str:
+    return db_type_for_doctor(type_ref, backend="sqlite")
+
+
+def db_type_for_doctor(type_ref: TypeRef, *, backend: str) -> str:
     if type_ref.name == "Option" and type_ref.args:
-        return sqlite_type_for_doctor(type_ref.args[0])
+        return db_type_for_doctor(type_ref.args[0], backend=backend)
+    if backend == "postgres":
+        if type_ref.name == "Bool":
+            return "BOOLEAN"
+        if type_ref.name in {"Float"}:
+            return "DOUBLE PRECISION"
+        if type_ref.name == "Money":
+            return "NUMERIC"
+        if type_ref.name in {"Int", "Id"}:
+            return "INTEGER"
+        return "TEXT"
     if type_ref.name in {"Bool", "Int", "Id"}:
         return "INTEGER"
-    if type_ref.name == "Float":
+    if type_ref.name in {"Float", "Money"}:
         return "REAL"
     return "TEXT"
 
 
 def normalize_sqlite_type(type_name: str) -> str:
+    return normalize_sql_type(type_name, backend="sqlite")
+
+
+def normalize_sql_type(type_name: str, *, backend: str) -> str:
+    if backend == "postgres":
+        return normalize_postgres_type(type_name)
     normalized = type_name.upper().strip()
     if "INT" in normalized:
         return "INTEGER"
@@ -547,6 +783,21 @@ def normalize_sqlite_type(type_name: str) -> str:
         return "TEXT"
     if any(token in normalized for token in ("REAL", "FLOA", "DOUB")):
         return "REAL"
+    return normalized or "TEXT"
+
+
+def normalize_postgres_type(type_name: str) -> str:
+    normalized = type_name.upper().strip()
+    if normalized in {"INT2", "INT4", "INTEGER", "SERIAL", "BIGSERIAL", "INT8", "BIGINT"}:
+        return "INTEGER" if normalized not in {"INT8", "BIGINT", "BIGSERIAL"} else "BIGINT"
+    if normalized in {"BOOL", "BOOLEAN"}:
+        return "BOOLEAN"
+    if normalized in {"FLOAT4", "FLOAT8", "REAL", "DOUBLE PRECISION"}:
+        return "DOUBLE PRECISION"
+    if normalized in {"NUMERIC", "DECIMAL", "MONEY"}:
+        return "NUMERIC"
+    if normalized in {"TEXT", "VARCHAR", "CHARACTER VARYING", "CHAR"}:
+        return "TEXT"
     return normalized or "TEXT"
 
 

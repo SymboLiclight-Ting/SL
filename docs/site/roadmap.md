@@ -2,7 +2,7 @@
 
 Current focus:
 
-- stabilize developer experience,
+- harden the production app kit,
 - keep generated Python readable,
 - validate SL against real sample applications,
 - improve IntentSpec and release workflows,
@@ -10,12 +10,11 @@ Current focus:
 
 Near-term candidates:
 
-- migration planning without automatic database mutation,
 - hosted documentation,
-- richer LSP navigation and refactoring,
-- publishing rehearsal when the project owner is ready.
+- package publishing rehearsal when the project owner is ready,
+- compatibility fixtures for v0.10 Project Ops API,
+- richer LSP navigation and refactoring.
 
 Long-term goal:
 
 - reach a stable `v1.0` with frozen core syntax, clear compatibility policy, reliable tooling, and real application case studies.
-

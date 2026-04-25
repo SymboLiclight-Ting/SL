@@ -34,11 +34,12 @@ from symboliclight.ast import (
 from symboliclight.diagnostics import Diagnostic, SourceLocation, SymbolicLightError
 from symboliclight.parser import parse_source
 
-PRIMITIVES = {"Bool", "Int", "Float", "Text"}
+PRIMITIVES = {"Bool", "Int", "Float", "Text", "Money"}
 GENERIC_ARITY = {"Id": 1, "List": 1, "Option": 1, "Result": 2}
 STORE_METHODS = {"insert", "all", "get", "update", "try_update", "delete", "filter", "count", "exists", "clear"}
 PYTHON_RESERVED_IDENTIFIERS = set(py_keyword.kwlist)
 GENERATED_CLI_COMMANDS = {"serve", "test"}
+STORE_BACKENDS = {"sqlite", "postgres"}
 
 
 @dataclass(slots=True)
@@ -100,6 +101,13 @@ class Checker:
             self.check_type_decl(type_decl)
         if isinstance(self.unit, App):
             for store in self.unit.stores:
+                if store.backend not in STORE_BACKENDS:
+                    self.error(
+                        f"Unsupported store backend `{store.backend}`.",
+                        store.location,
+                        "Use `using sqlite` or `using postgres`.",
+                        code="SLC093",
+                    )
                 self.check_type_ref(store.type_ref, store.location)
                 if store.type_ref.name not in self.types:
                     self.error(
@@ -107,6 +115,7 @@ class Checker:
                         store.location,
                         "Declare a record type and use it as the store item type.",
                     )
+            self.check_store_backend_mix()
             for config in self.unit.configs:
                 self.check_config(config)
             for fixture in self.unit.fixtures:
@@ -346,6 +355,19 @@ class Checker:
                 )
                 continue
             seen[key] = route
+
+    def check_store_backend_mix(self) -> None:
+        assert isinstance(self.unit, App)
+        backends = {store.backend for store in self.unit.stores if store.backend in STORE_BACKENDS}
+        if len(backends) <= 1:
+            return
+        rendered = ", ".join(sorted(backends))
+        self.error(
+            f"App mixes store backends: {rendered}.",
+            self.unit.location,
+            "Use one store backend per app in v0.10.",
+            code="SLC094",
+        )
 
     def check_intents(self) -> None:
         assert isinstance(self.unit, App)

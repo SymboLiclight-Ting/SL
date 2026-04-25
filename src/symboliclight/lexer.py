@@ -12,6 +12,7 @@ KEYWORDS = {
     "intent",
     "permissions",
     "from",
+    "using",
     "enum",
     "type",
     "config",

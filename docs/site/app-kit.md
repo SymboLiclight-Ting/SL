@@ -11,7 +11,13 @@ route POST "/todos" body CreateTodo -> Response<Todo> {
 }
 ```
 
-SQLite store helpers:
+Store helpers, available for SQLite and Postgres backends:
+
+```sl
+store items: Item
+store items: Item using sqlite
+store items: Item using postgres
+```
 
 - `insert(record) -> T`
 - `all() -> List<T>`
@@ -32,4 +38,3 @@ config AppConfig = {
   port: Int = env_int("PORT", 8000),
 }
 ```
-

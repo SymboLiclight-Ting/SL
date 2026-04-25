@@ -27,6 +27,36 @@ def test_codegen_emits_valid_python(tmp_path: Path) -> None:
     py_compile.compile(str(output), doraise=True)
 
 
+def test_codegen_emits_postgres_backend_sql(tmp_path: Path) -> None:
+    source = """
+app PgDemo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+    done: Bool,
+  }
+
+  store items: Item using postgres
+
+  command add(title: Text) -> Item {
+    return items.insert({ title: title, done: false })
+  }
+}
+"""
+    app = parse_source(source, path="pg_demo.sl")
+    diagnostics = check_program(app, source_path=Path("pg_demo.sl"))
+    generated = generate_python(app)
+    output = tmp_path / "pg_demo.py"
+    output.write_text(generated, encoding="utf-8")
+
+    assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
+    assert "SL_DB_BACKEND = 'postgres'" in generated
+    assert "import psycopg" in generated
+    assert "RETURNING \"id\"" in generated
+    assert "%s" in generated
+    py_compile.compile(str(output), doraise=True)
+
+
 def test_generated_cli_add_and_list(tmp_path: Path) -> None:
     source_path = ROOT / "examples" / "todo_app.sl"
     app = parse_source(source_path.read_text(encoding="utf-8"), path=str(source_path))

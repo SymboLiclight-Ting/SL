@@ -124,3 +124,14 @@ v0.9 stabilizes developer experience without changing `.sl` core syntax:
 - LSP hover, definition, document symbols, and formatting are broader but remain developer-preview surfaces,
 - compatibility fixtures under `tests/compat/` preserve representative v0.6, v0.7, and v0.8 example behavior,
 - docs site Markdown files under `docs/site/` are documentation source material and do not introduce a site generator commitment.
+
+## v0.10 Notes
+
+v0.10 adds production app kit surfaces while preserving existing SQLite apps:
+
+- `store name: Type using sqlite` and `using postgres` are additive; omitted backend remains `sqlite`,
+- one app may use only one store backend in v0.10,
+- Postgres runtime support is optional through `symboliclight[postgres]`; default installs do not gain a mandatory database driver,
+- `slc migrate plan` is additive and read-only,
+- migration planning and `doctor --db` do not execute SQL changes and do not mutate user databases,
+- `project-ops-api` is an additive gallery example for production-app-kit validation.

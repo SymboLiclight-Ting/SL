@@ -8,26 +8,26 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.9.0-rc2` 本地发布候选准备中。
-- 当前实现基线：`def530f Update development plan for v0.9 status`，后续 release version bump 位于其后。
+- 当前版本状态：`v0.10.0-rc1` 开发中。
+- 当前实现基线：`v0.9.0-rc2`，后续 v0.10 Production App Kit 改动位于其后。
 - 当前 tag：`v0.9.0-rc1` 仍指向 `3e9c196 Implement v0.9 DX stabilization`，未移动；`v0.9.0-rc2` 应指向当前 release bump 提交。
 - 当前工作树：干净。
-- 发布状态：已完成 post-RC review 收口，准备从 `v0.9.0-rc2` 重新执行 fresh release 演练，未上传 TestPyPI 或 PyPI。
-- 下一 release 动作：从 `v0.9.0-rc2` fresh checkout 运行 `python scripts\release_check.py`。
+- 发布状态：`v0.9.0-rc2` 已完成本地 fresh release 演练，v0.10 仍未打 tag，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：完成 v0.10 回归后打 `v0.10.0-rc1` 并重新执行 fresh release 演练。
 
 按“成熟语言 100%”口径估算：
 
 ```text
-当前整体成熟度：约 50%
-当前公开试用准备度：约 88%
-当前 v0.9 release candidate 完成度：约 100%
+当前整体成熟度：约 60%
+当前公开试用准备度：约 90%
+当前 v0.10 development candidate 完成度：约 100%
 ```
 
 这三个数字代表不同层级：
 
 - 整体成熟度看的是能否成为稳定、可长期使用、生态完整的应用开发语言。
 - 公开试用准备度看的是外部开发者能否安装、跑示例、理解定位、提交反馈。
-- v0.9 release candidate 完成度看的是当前阶段目标是否完成。
+- v0.10 development candidate 完成度看的是当前阶段目标是否完成。
 
 ## 100% 成熟定义
 
@@ -56,8 +56,8 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 36% 到 40% | v0.4 Standard App Kit | 已完成 | typed route body、Response、fixtures、schema、config、stdlib thin wrappers |
 | 40% 到 42% | v0.5 到 v0.8 Public Preview Hardening | 已完成 | LSP、gallery、IntentSpec、small-admin、schema diff、release RC |
 | 42% 到 50% | v0.9 DX Stabilization | 当前完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
-| 50% 到 60% | v0.10 Production App Kit | 下一阶段 | Postgres、migration plan、auth helpers、larger real apps |
-| 60% 到 70% | v0.11 Ecosystem Preview | 未开始 | docs site、plugin examples、package story、template gallery |
+| 50% 到 60% | v0.10 Production App Kit | 当前完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
+| 60% 到 70% | v0.11 Ecosystem Preview | 下一阶段 | docs site、plugin examples、package story、template gallery |
 | 70% 到 80% | v0.12 Beta | 未开始 | compatibility suite、security review、cross-platform install |
 | 80% 到 90% | v0.13 Release Candidate | 未开始 | syntax freeze candidate、API freeze candidate、migration guides |
 | 90% 到 100% | v1.0 Stable | 未开始 | compatibility guarantee、stable docs、public release |
@@ -400,34 +400,38 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 50% 到 60%：v0.10 Production App Kit
 
-状态：未开始。
+状态：当前完成，待打 `v0.10.0-rc1` 本地发布候选。
 
 核心目标：
 
 - 让 SL 能写更接近生产的后端小应用。
 - 保持标准库克制，不做大而全框架。
 
-必须做：
+已完成：
 
-- Postgres first-class backend，SQLite 继续保留。
-- DB URL typed config。
-- migration plan 输出。
-- migration diff 更细粒度。
-- generated SQL preview。
-- transaction helper。
-- pagination pattern。
-- typed query parameters。
-- route status helper。
-- structured error response pattern。
-- request query helper。
-- request path helper，前提是明确 path param 语义。
+- `store name: Type using sqlite` 和 `store name: Type using postgres`。
+- 默认 store backend 仍为 SQLite。
+- Postgres runtime 作为 optional dependency：`symboliclight[postgres]`。
+- 一份 app 只允许一个 store backend。
+- Postgres generated CRUD helper，覆盖 insert、all、get、update、try_update、delete、filter、count、exists、clear。
+- `slc migrate plan <file.sl> --db path-or-url`。
+- `slc migrate plan --json`。
+- SQLite 和 Postgres schema inspection 使用同一 diff model。
+- migration plan 覆盖 missing table、extra table、missing column、extra column、type mismatch。
+- Project Ops API gallery 示例，包含 SQLite fallback app 和 Postgres codegen app。
+- release check 覆盖 Project Ops API 和 Postgres codegen/migrate-plan path。
 
-建议做：
+推迟到后续：
 
 - password hashing wrapper，但不实现完整 auth 系统。
 - API token helper，但不做 session middleware。
 - OpenAPI export，优先从 `slc schema` 扩展。
 - `slc doctor --ci`。
+- transaction helper。
+- pagination pattern。
+- typed query parameters。
+- request query helper。
+- request path helper，前提是明确 path param 语义。
 
 明确不做：
 
@@ -439,9 +443,10 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 验收标准：
 
 - 一个中等复杂 admin API 可用 SL 编写。
-- Postgres 示例可 check/build/test。
+- Postgres 示例可 check/build/py_compile。
 - migration plan 对新增表、新增列、删除列、类型变化有稳定输出。
 - generated Python 仍可读。
+- 默认安装仍不强制安装 Postgres driver。
 
 完成后成熟度估计：
 
@@ -671,7 +676,7 @@ v1.0 兼容承诺：
 
 ### 应用框架风险
 
-- SQLite 已可用，但 Postgres 尚未开始。
+- SQLite 已可用，Postgres 已有最小 backend 和 codegen，仍需要真实服务集成与长期项目验证。
 - migration 只检查和提示，不会生成完整可执行迁移方案。
 - auth 只有显式 header helper，没有 middleware、session、password hashing。
 - HTTP runtime 基于 Python stdlib，适合原型和小应用，不适合高性能生产服务。
@@ -686,20 +691,20 @@ v1.0 兼容承诺：
 
 ## 下一步推荐
 
-最推荐的下一阶段是 v0.10 Production App Kit，但在进入 v0.10 前应先完成 `v0.9.0-rc2` fresh release 演练。
+最推荐的下一阶段是 v0.11 Ecosystem Preview，但在进入 v0.11 前应先完成 `v0.10.0-rc1` fresh release 演练。
 
 优先级：
 
-1. 从 `v0.9.0-rc2` 重新执行 fresh tag release 演练。
-2. v0.10 开始前，冻结 v0.9 的 compatibility fixtures，作为后续回归基线。
-3. 设计 migration plan 输出，不自动改数据库。
-4. 设计 Postgres 最小集成边界，避免把 SL 变成大而全 ORM。
+1. 打 `v0.10.0-rc1` 并从 tag 重新执行 fresh release 演练。
+2. 冻结 v0.10 Project Ops API 作为新的 compatibility fixture 候选。
+3. 准备 hosted docs preview，继续保持 Markdown 源文件。
+4. 梳理 PyPI/TestPyPI 发布 checklist，但是否上传仍由项目 owner 决定。
 5. 基于 gallery 反馈梳理 route、command、store ergonomics 的高频痛点。
 
-v0.10 的成功标准：
+v0.11 的成功标准：
 
-- 至少一个更接近生产的后端样板使用 typed config、DB、auth helper、schema doctor 和 tests。
-- Postgres 或 migration plan 至少完成一个，不同时硬上两个高风险方向。
-- v0.6 到 v0.9 compatibility fixtures 继续通过。
-- `slc doctor` 和 release check 能覆盖新生产能力的失败路径。
+- 文档站可以本地或静态托管预览。
+- 示例模板和 gallery 入口更容易被外部开发者发现。
+- v0.6 到 v0.10 compatibility fixtures 继续通过。
+- packaging 和 release checklist 足够清晰，可以支持一次人工发布演练。
 - 文档明确告诉用户哪些能力可试用，哪些仍是实验性能力。
