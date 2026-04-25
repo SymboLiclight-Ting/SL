@@ -114,7 +114,8 @@ Implemented in the current mainline:
 - summary schema diff output in `slc doctor --db`,
 - `try_update(id, record) -> Option<T>` for SQLite stores,
 - `response_ok` and `response_err` helpers for `Response<Result<...>>`,
-- Small Admin Backend refactored around explicit auth helper and `ErrorBody`.
+- Small Admin Backend refactored around explicit auth helper and `ErrorBody`,
+- release-facing schema drift wording and local doctor drift smoke coverage.
 
 Deferred to later releases:
 
@@ -122,6 +123,15 @@ Deferred to later releases:
 - documentation site,
 - compatibility test suite across prior examples,
 - generated migration SQL.
+
+## v0.9 Candidate Direction
+
+Likely next work:
+
+- comment-preserving formatter,
+- stronger IDE/LSP polish,
+- richer migration planning without automatic data mutation,
+- compatibility fixtures across v0.6, v0.7, and v0.8 examples.
 
 ## v1.0 Stable
 

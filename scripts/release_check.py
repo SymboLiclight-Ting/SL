@@ -40,6 +40,7 @@ def release_commands(*, skip_package: bool) -> list[list[str]]:
         [python, "-m", "py_compile", "build/notes_api.py"],
         [python, "build/notes_api.py", "test"],
         [python, "-m", "symboliclight.cli", "doctor", "examples/notes_api.sl"],
+        [python, "scripts/doctor_drift_smoke.py"],
     ]
     for source in [
         "examples/gallery/todo-api-cli/app.sl",

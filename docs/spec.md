@@ -119,7 +119,7 @@ todos.clear() -> Int
 
 `clear()` is test-only in v0.4.
 
-Generated Python includes schema metadata and records a schema hash in `sl_migrations`. v0.4 detects schema drift and prints a warning at startup; it does not perform automatic data migrations.
+Generated Python includes schema metadata and records a schema hash in `sl_migrations`. v0.8 detects schema drift and prints a warning at startup; it does not perform automatic data migrations and does not overwrite stored drift metadata unless the database is first initialized.
 
 ### `config`
 
@@ -177,7 +177,7 @@ route POST "/todos" body CreateTodo -> Response<Todo> {
 
 `Response<T>` supports `status`, optional `headers`, and `body`. v0.4 does not support streaming, cookies, middleware, or auth.
 
-`response_ok(status: Int, body: T)` returns `Response<Result<T, ErrorBody>>`. `response_err(status: Int, code: Text, message: Text)` returns an error response using an `ErrorBody`-style record with `code: Text` and `message: Text`. These helpers do not introduce generic function syntax; their target types are checked from the enclosing route return type.
+`response_ok(status: Int, body: T)` returns a `Response<Result<T, E>>` success response from the enclosing route target. `response_err(status: Int, code: Text, message: Text)` returns an error response using the route target's `ErrorBody`-style record, which must provide `code: Text` and `message: Text`. `ErrorBody` is the recommended gallery name, not a required built-in type name. These helpers do not introduce generic function syntax; their target types are checked from the enclosing route return type.
 
 Routes may read HTTP headers through the minimal request helper:
 
@@ -298,7 +298,7 @@ These hints avoid adding nonstandard top-level fields to IntentSpec while still 
 
 The same hints are used by `slc test` when `test from intent.acceptance` is declared. Missing hinted routes or commands fail offline acceptance. Extra routes or commands are reported as warnings.
 
-`slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and reports schema drift as `not initialized`, `up to date`, or `drift detected`. When drift is detected, v0.8 also reports summary schema differences for missing or extra tables, missing or extra columns, and column type mismatches. The command never mutates the database and does not perform automatic migrations.
+`slc doctor --db` inspects a SQLite database's `sl_migrations` metadata and the actual SQLite table structure. `schema drift: up to date` means the stored hash matches the generated hash. `schema diff: no structural difference detected` means the actual SQLite structure also matches. If the hash matches but the structure differs, doctor reports `schema drift: structural drift detected`. If the hash differs, doctor reports `schema drift: drift detected` and still includes summary schema differences. Diff lines use stable release-facing forms: `missing table`, `extra table`, `missing column`, `extra column`, and `type mismatch`. The command never mutates the database and does not perform automatic migrations.
 
 ## Generated Python Contract
 

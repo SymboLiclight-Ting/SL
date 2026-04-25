@@ -19,3 +19,5 @@ slc doctor app.sl
 - `issue-tracker`: explicit imports, enum status, filtering, and IntentSpec declarations.
 - `customer-brief-generator`: command alignment, file input, and Markdown output.
 - `small-admin-backend`: v0.8 real-app hardening for auth helper extraction, `ErrorBody`, schema diff checks, multiple stores, routes, and commands.
+
+`ErrorBody` is the recommended gallery name for application errors, not a required built-in type name. Custom error record names are supported when they provide `code: Text` and `message: Text`.

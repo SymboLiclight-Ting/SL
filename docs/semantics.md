@@ -61,9 +61,9 @@ Supported store methods:
 
 `count()` returns the number of rows in a store. `exists(id)` checks whether an item exists. `clear()` deletes all rows and is allowed only in `test` blocks.
 
-Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.4 does not automatically migrate data.
+Generated Python records a schema hash in `sl_migrations`. If the stored hash differs from the generated hash, startup prints a schema drift warning. v0.8 does not automatically migrate data and does not replace the stored hash on drift. A matching hash is metadata evidence only; it is not a substitute for structural inspection.
 
-`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only and returns one of three states: `not initialized`, `up to date`, or `drift detected`. Drift reports include summary schema differences and a manual migration suggestion; v0.8 never modifies application data.
+`slc doctor --db path/to/app.sqlite` can inspect the same metadata without running the generated app. The report is read-only. It separates hash state from table structure: `schema drift: up to date` means the hash matches, `schema diff: no structural difference detected` means table structure matches, `schema drift: structural drift detected` means the hash matches but the actual schema differs, and `schema drift: drift detected` means the stored hash differs from the generated hash. Drift reports include summary schema differences and a manual migration suggestion; v0.8 never modifies application data.
 
 ## Request Body Semantics
 

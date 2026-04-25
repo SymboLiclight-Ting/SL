@@ -184,6 +184,8 @@ python scripts/package_smoke.py --gallery
 python scripts/release_check.py
 ```
 
+For a local `v0.8.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, and exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column. No TestPyPI or PyPI upload is performed by these commands.
+
 ## Project Status
 
 This is a public developer preview. The goal is to prove that a spec-native application language can compile into readable, runnable Python while keeping source code compact and AI-friendly. v0.x remains experimental and may include breaking changes before v1.0.
