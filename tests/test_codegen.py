@@ -675,6 +675,7 @@ app DriftRuntime {
         database.close()
 
     assert "schema drift detected" in completed.stderr
+    assert "v0.8" not in completed.stderr
     assert stored == old_hash
     assert stored != generate_schema_hash(app)
 

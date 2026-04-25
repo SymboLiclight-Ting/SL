@@ -1028,7 +1028,7 @@ class Checker:
                     self.validate_record_expr(expr.args[1].expr, item_type, allow_missing_id=True, env=env)
                 else:
                     self.error(
-                        "Store try_update requires a record literal in v0.8.",
+                        "Store try_update requires a record literal.",
                         expr.args[1].location,
                         "Use `items.try_update(id, { field: value })`.",
                     )

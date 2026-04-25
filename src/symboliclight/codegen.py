@@ -177,7 +177,7 @@ class PythonGenerator:
             "    if row is None:",
             "        database.execute('INSERT INTO sl_migrations (version, schema_hash) VALUES (?, ?)', [SL_SCHEMA_VERSION, SL_SCHEMA_HASH])",
             "    elif row['schema_hash'] != SL_SCHEMA_HASH:",
-            "        print('warning: SymbolicLight schema drift detected; automatic migrations are not implemented in v0.8', file=sys.stderr)",
+            "        print('warning: SymbolicLight schema drift detected; automatic migrations are not implemented', file=sys.stderr)",
         ])
         if not self.app.stores:
             lines.extend(["    database.commit()", "    return"])
