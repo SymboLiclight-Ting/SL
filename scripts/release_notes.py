@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate local SL release notes.")
-    parser.add_argument("--from", dest="from_ref", default="v0.11.0-rc1")
+    parser.add_argument("--from", dest="from_ref", default="v0.12.0-rc1")
     parser.add_argument("--to", dest="to_ref", default="HEAD")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.13.0rc1
+
+- Added the v1.0 freeze candidate document for syntax, CLI, JSON, and generated HTTP surfaces.
+- Added v0.12 to v0.13 and v1.0 readiness migration notes.
+- Added v0.12 compatibility fixtures for release-candidate regression coverage.
+- Added freeze and example-matrix maintenance checks to the release gate.
+- Updated release process, release checklist, and development planning docs for the v0.13 release candidate.
+
 ## v0.12.0rc1
 
 - Added beta hardening for generated HTTP errors, including stable JSON envelopes and a fixed request body limit.

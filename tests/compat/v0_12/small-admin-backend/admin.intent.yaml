@@ -1,0 +1,54 @@
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /health
+# sl: route GET /admins
+# sl: route POST /admins
+# sl: route PATCH /admins/disable
+# sl: route GET /audit
+# sl: command create_admin
+# sl: command list_admins
+# sl: command disable_admin
+# sl: command create_session
+
+metadata:
+  name: "small-admin-backend"
+  title: "Small Admin Backend"
+  owner: "symboliclight"
+
+task:
+  goal: "Validate SL against a small admin backend with auth, config, SQLite stores, routes, commands, and audit events."
+  audience:
+    - "Application developer"
+  priority: "high"
+
+permissions:
+  web: true
+  filesystem:
+    read: false
+    write: true
+  network: false
+  tools:
+    create_file: true
+    delete_file: false
+    send_email: false
+    purchase: false
+
+constraints:
+  - "Use local SQLite storage only."
+  - "Require an Authorization header for admin and audit routes."
+  - "Do not implement automatic schema migration."
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 600
+  sections:
+    - "Run"
+    - "Auth"
+    - "Migration"
+
+tests:
+  - name: "Small admin backend acceptance"
+    assert:
+      - type: "required_sections"

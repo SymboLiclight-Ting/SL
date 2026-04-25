@@ -156,3 +156,13 @@ v0.12 is a beta hardening release and does not add core `.sl` syntax:
 - generated store helpers wrap database driver exceptions with stable operation names,
 - CLI exit codes are documented as `0` for success or warnings, `1` for compiler/runtime/check failures, and `2` for `argparse` usage errors,
 - `tests/compat/v0_11/` freezes v0.11 starter-template output as a compatibility baseline.
+
+## v0.13 Notes
+
+v0.13 is a release-candidate hardening release and does not add core `.sl` syntax:
+
+- v0.12 source files are expected to work unchanged,
+- public freeze-candidate surfaces are listed in `docs/freeze-candidate.md`,
+- migration notes live in `docs/migration/v0_12_to_v0_13.md` and `docs/migration/v1_0_readiness.md`,
+- `tests/compat/v0_12/` freezes representative v0.12 behavior,
+- any v0.13 bug fix that changes user-visible behavior must update this file, `CHANGELOG.md`, and a compat or regression test.

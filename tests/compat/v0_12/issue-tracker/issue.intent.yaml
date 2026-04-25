@@ -1,0 +1,47 @@
+version: "0.1"
+kind: "IntentSpec"
+
+# sl: route GET /issues
+# sl: command create
+# sl: command list_open
+
+metadata:
+  name: "issue_tracker"
+  title: "Issue Tracker"
+  owner: "symboliclight"
+
+task:
+  goal: "Build a small issue tracker with status filtering."
+  audience:
+    - "Application developer"
+  priority: "medium"
+
+permissions:
+  web: true
+  filesystem:
+    read: true
+    write: true
+  network: false
+  tools:
+    create_file: true
+    delete_file: false
+    send_email: false
+    purchase: false
+
+constraints:
+  - "Use local SQLite storage only."
+  - "Expose JSON routes for issues."
+
+output:
+  format: "markdown"
+  language: "en"
+  max_words: 500
+  sections:
+    - "Build"
+    - "Run"
+    - "Test"
+
+tests:
+  - name: "Issue tracker smoke test"
+    assert:
+      - type: "required_sections"

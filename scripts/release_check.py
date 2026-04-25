@@ -34,6 +34,8 @@ def release_commands(*, skip_package: bool, fast: bool = False) -> list[list[str
         [python, "-m", "compileall", "-q", "src", "playground", "scripts"],
         [python, "scripts/docs_check.py"],
         [python, "scripts/vscode_check.py"],
+        [python, "scripts/freeze_check.py"],
+        [python, "scripts/example_matrix.py"],
         [python, "-m", "symboliclight.cli", "check", "--json", "examples/todo_app.sl"],
         [python, "-m", "symboliclight.cli", "test", "examples/todo_app.sl"],
         [python, "-m", "symboliclight.cli", "doctor", "examples/todo_app.sl"],
@@ -45,7 +47,7 @@ def release_commands(*, skip_package: bool, fast: bool = False) -> list[list[str
         [python, "-m", "symboliclight.cli", "doctor", "examples/notes_api.sl"],
         [python, "scripts/doctor_drift_smoke.py"],
         [python, "scripts/compat_check.py"],
-        [python, "scripts/release_notes.py", "--to", "HEAD", "--out", "build/release-notes.md"],
+        [python, "scripts/release_notes.py", "--from", "v0.12.0-rc1", "--to", "HEAD", "--out", "build/release-notes.md"],
     ]
     gallery_sources = [
         "examples/gallery/todo-api-cli/app.sl",

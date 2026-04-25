@@ -4,6 +4,8 @@
 - Run `python -m compileall -q src playground scripts`.
 - Run `python scripts/docs_check.py`.
 - Run `python scripts/vscode_check.py`.
+- Run `python scripts/freeze_check.py`.
+- Run `python scripts/example_matrix.py`.
 - Run `python scripts/cross_platform_smoke.py` when doing local preflight.
 - Run `slc check examples/todo_app.sl`.
 - Run `slc check --json examples/todo_app.sl`.
@@ -29,6 +31,7 @@
 - Run `python scripts/package_smoke.py --gallery`.
 - Run `python scripts/package_smoke.py --gallery --python path/to/python` when checking a specific Python interpreter.
 - Run `python scripts/release_check.py` for the full package-inclusive release gate.
-- Run `python scripts/release_notes.py --to HEAD --out build/release-notes.md`.
-- For release candidates, build with a PEP 440 pre-release version such as `0.12.0rc1`.
+- Run `python scripts/release_notes.py --from v0.12.0-rc1 --to HEAD --out build/release-notes.md`.
+- For release candidates, build with a PEP 440 pre-release version such as `0.13.0rc1`.
+- For v0.13 RC, confirm `docs/freeze-candidate.md`, `docs/migration/v0_12_to_v0_13.md`, and `docs/v1-blockers.md` are current.
 - Upload only when the project owner explicitly chooses TestPyPI or PyPI publishing.

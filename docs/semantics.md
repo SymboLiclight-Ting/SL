@@ -164,6 +164,12 @@ Files containing `//` comments are rewritten only when comments can be preserved
 
 The local playground compiles submitted `.sl` source to Python or diagnostics JSON. It is a preview tool and not a production runtime.
 
+## v0.13 Release Candidate Boundary
+
+v0.13 is a compatibility and release-candidate phase. It does not add semantic constructs. The v0.13 work treats the existing route, store, response, diagnostics, doctor, migrate, and generated HTTP error behavior as a freeze candidate for v1.0.
+
+If implementation hardening changes observable behavior, the change must be documented as a compatibility note and covered by a regression fixture before release.
+
 ## IntentSpec Doctor Hints
 
 `slc doctor` may read SL-specific hints from IntentSpec comments:

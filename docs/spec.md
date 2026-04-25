@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.11
+# SymbolicLight Language Specification v0.13
 
-This document defines SymbolicLight v0.11 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.13 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 
@@ -383,6 +383,12 @@ severity + code + message + file + line + column + suggestion
 
 Parser diagnostics use `SLP...` codes. Checker diagnostics use `SLC...` codes. Lexer diagnostics use `SLL...` codes.
 
+## v0.13 Freeze Candidate
+
+v0.13 does not add `.sl` syntax. It identifies the current public language, CLI, JSON, and generated HTTP surfaces as a freeze candidate for v1.0. The authoritative list lives in `docs/freeze-candidate.md`.
+
+Any compatibility-affecting change during v0.13 must update this specification, `docs/compatibility.md`, `CHANGELOG.md`, and a regression or compatibility fixture.
+
 ## Out Of Scope Before v1.0
 
 - frontend UI,
@@ -390,5 +396,5 @@ Parser diagnostics use `SLP...` codes. Checker diagnostics use `SLC...` codes. L
 - macro system,
 - advanced generics beyond `Id`, `List`, `Option`, and `Result`,
 - custom async runtime,
-- Postgres support,
+- production-grade database administration beyond the current SQLite and optional Postgres app kit,
 - real LLM or agent runtime.

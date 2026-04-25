@@ -7,8 +7,12 @@ Recommended process:
 ```bash
 pytest -q
 python -m compileall -q src playground scripts
+python scripts/docs_check.py
+python scripts/vscode_check.py
+python scripts/freeze_check.py
+python scripts/example_matrix.py
 python scripts/release_check.py
-git tag v0.11.0-rc1
+git tag v0.13.0-rc1
 python scripts/release_check.py
 ```
 

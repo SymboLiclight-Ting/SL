@@ -1,6 +1,6 @@
 # SL Developer Preview
 
-SL v0.11 is a public developer preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
+SL v0.13 is a release-candidate preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
 
 ## What Is Ready
 
@@ -16,7 +16,7 @@ SL v0.11 is a public developer preview. It is usable for experiments, examples, 
 
 ## What Is Not Stable Yet
 
-- Syntax and standard library APIs may still change before v1.0.
+- Syntax and standard library APIs are now freeze candidates, but may still change before v1.0 if a release-candidate blocker requires it.
 - VS Code support is local-preview only and is not published to the marketplace.
 - The playground is local-only and not a hosted product.
 - Postgres support requires optional dependencies and remains preview quality.
@@ -29,5 +29,7 @@ slc check examples/notes_api.sl
 slc build examples/notes_api.sl --out build/notes_api.py
 python -m py_compile build/notes_api.py
 python build/notes_api.py test
+python scripts/freeze_check.py
+python scripts/example_matrix.py
 python scripts/release_check.py --skip-package
 ```

@@ -16,3 +16,5 @@ Start with:
 - [Error Handling](error-handling.md)
 - [AI-assisted Development](ai-assisted-development.md)
 - [Roadmap](roadmap.md)
+
+v0.13 is the current release-candidate hardening phase. The freeze candidate surfaces are tracked in [../freeze-candidate.md](../freeze-candidate.md).

@@ -8,26 +8,26 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.12.0-rc1` Beta Hardening 已完成。
-- 当前实现基线：`v0.12.0-rc1`，commit `e5c93ab Implement v0.12 beta hardening`。
-- 当前 tag：`v0.12.0-rc1` 已完成本地 fresh release 演练。
-- 当前工作树：文档进度同步中。
-- 发布状态：`v0.12.0-rc1` 已完成，未上传 TestPyPI 或 PyPI。
-- 下一 release 动作：进入 v0.13 Release Candidate，准备 syntax/API freeze candidate、迁移指南和更严格的 v1.0 前兼容审查。
+- 当前版本状态：`v0.13.0-rc1` Release Candidate 已完成。
+- 当前实现基线：`v0.13.0-rc1` release candidate。
+- 当前 tag：`v0.13.0-rc1` 已完成本地 fresh release 演练。
+- 当前工作树：v0.13 release candidate 已收口。
+- 发布状态：`v0.13.0-rc1` 已完成，未上传 TestPyPI 或 PyPI。
+- 下一 release 动作：进入 v1.0 Stable 规划，确定最终兼容承诺、公开发布策略和 v1.0 blocker 处理顺序。
 
 按“成熟语言 100%”口径估算：
 
 ```text
-当前整体成熟度：约 80%
-当前公开试用准备度：约 97%
-当前 v0.12 beta hardening 完成度：100%
+当前整体成熟度：约 90%
+当前公开试用准备度：约 98%
+当前 v0.13 release candidate 完成度：100%
 ```
 
 这三个数字代表不同层级：
 
 - 整体成熟度看的是能否成为稳定、可长期使用、生态完整的应用开发语言。
 - 公开试用准备度看的是外部开发者能否安装、跑示例、理解定位、提交反馈。
-- v0.12 beta hardening 完成度看的是当前阶段目标是否完成。
+- v0.13 release candidate 完成度看的是当前阶段目标是否完成。
 
 ## 100% 成熟定义
 
@@ -59,7 +59,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 50% 到 60% | v0.10 Production App Kit | 已完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
 | 60% 到 70% | v0.11 Ecosystem Preview | 已完成 | docs site、template gallery、contribution path、release docs |
 | 70% 到 80% | v0.12 Beta | 已完成 | compatibility suite、security review、cross-platform install |
-| 80% 到 90% | v0.13 Release Candidate | 下一阶段 | syntax freeze candidate、API freeze candidate、migration guides |
+| 80% 到 90% | v0.13 Release Candidate | 已完成 | syntax freeze candidate、API freeze candidate、migration guides |
 | 90% 到 100% | v1.0 Stable | 未开始 | compatibility guarantee、stable docs、public release |
 
 ## 0% 到 5%：项目定位
@@ -512,7 +512,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 
 ## 70% 到 80%：v0.12 Beta
 
-状态：未开始。
+状态：已完成，`v0.13.0-rc1` 本地发布候选已打 tag 并完成 fresh release 演练。
 
 核心目标：
 
@@ -579,13 +579,13 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 - generated Python contract freeze candidate。
 - diagnostics code freeze candidate。
 - docs freeze candidate。
-- migration guide from v0.8 到 v0.13。
+- migration guide from v0.12 到 v0.13。
 - deprecation policy。
 - release branch strategy。
 
 建议做：
 
-- `slc fix` 迁移辅助。
+- `slc fix` 迁移辅助，推迟到 v1.0 之后评估。
 - deprecation warnings。
 - language server performance pass。
 - formatter idempotency proof tests。
@@ -694,20 +694,20 @@ v1.0 兼容承诺：
 
 ## 下一步推荐
 
-最推荐的下一阶段是 v0.12 Beta，重点做兼容性、跨平台安装、安全边界和真实数据库集成硬化。
+最推荐的下一阶段是 v1.0 Stable，重点处理 `docs/v1-blockers.md` 中的 blocker，确定最终兼容承诺和公开发布策略。
 
 优先级：
 
-1. 建立 Windows、macOS、Linux CI 矩阵，至少覆盖 Python 3.11 和 3.12。
-2. 把 v0.10、v0.11 release candidates 纳入兼容性 fixture 说明和回归基线。
-3. 做 generated Python security review，重点看 path/file builtins、HTTP body parsing、SQLite/Postgres error mapping。
-4. 梳理 PyPI/TestPyPI 发布 checklist，但是否上传仍由项目 owner 决定。
-5. 基于 gallery 反馈梳理 route、command、store ergonomics 的高频痛点。
+1. 审核 `docs/freeze-candidate.md`，把真正进入 v1.0 兼容承诺的 surface 标记为 stable。
+2. 逐项处理 `docs/v1-blockers.md` 的 blocker。
+3. 编写 v1.0 compatibility policy 和 public release checklist。
+4. 决定是否发布到 TestPyPI 或 PyPI。
+5. 从 v1.0 release tag 做 fresh release 演练。
 
-v0.12 的成功标准：
+v1.0 的成功标准：
 
-- 三平台 CI 可以跑通核心测试。
-- v0.6 到 v0.11 compatibility fixtures 继续通过。
-- 安装包可以在干净环境中稳定使用。
-- security review 没有 P0/P1 未解决项。
-- 文档明确告诉用户哪些能力可试用，哪些仍是实验性能力。
+- stable spec、semantics、compatibility policy 和 generated runtime contract 均已完成。
+- v0.6 到 v0.13 compatibility fixtures 继续通过。
+- release check、package smoke 和 fresh tag rehearsal 继续通过。
+- 公共发布策略明确，且不含未解决 P0/P1 blocker。
+- 文档明确告诉用户哪些 surface 已稳定，哪些仍是实验性能力。

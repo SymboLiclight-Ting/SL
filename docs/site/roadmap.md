@@ -2,12 +2,11 @@
 
 Current focus:
 
-- beta hardening,
-- cross-platform install checks,
-- Python 3.11 and 3.12 validation,
-- compatibility fixture expansion,
-- generated Python security review,
-- stable CLI exit code audit.
+- release-candidate hardening,
+- syntax and API freeze candidate review,
+- migration and compatibility guide drafting,
+- stricter docs and example consistency checks,
+- final v1.0 blocker classification.
 
 Near-term candidates:
 

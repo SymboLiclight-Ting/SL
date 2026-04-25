@@ -197,9 +197,9 @@ Deferred from v0.12:
 - automatic migrations,
 - production-grade HTTP hosting.
 
-## v0.13 Release Candidate Direction
+## v0.13 Release Candidate
 
-Next work:
+Implemented:
 
 - syntax freeze candidate review,
 - standard API freeze candidate review,
@@ -207,6 +207,13 @@ Next work:
 - stricter docs and example consistency checks,
 - final v1.0 blocker list,
 - public release readiness review.
+
+Deferred from v0.13:
+
+- public package upload,
+- automatic migrations,
+- package registry,
+- production-grade HTTP hosting.
 
 ## v1.0 Stable
 
