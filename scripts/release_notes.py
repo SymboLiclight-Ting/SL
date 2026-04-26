@@ -25,11 +25,7 @@ def main() -> int:
 
 def render_release_notes(from_ref: str, to_ref: str) -> str:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    commits = subprocess.check_output(
-        ["git", "log", "--oneline", f"{from_ref}..{to_ref}"],
-        cwd=ROOT,
-        text=True,
-    ).strip()
+    commits, commit_note = collect_commits(from_ref, to_ref)
     version_block = current_changelog_entry(changelog)
     lines = [
         "# SymbolicLight Release Notes Draft",
@@ -41,12 +37,42 @@ def render_release_notes(from_ref: str, to_ref: str) -> str:
         "## Commits",
         "",
     ]
+    if commit_note:
+        lines.extend([commit_note, ""])
     if commits:
         lines.extend(f"- {line}" for line in commits.splitlines())
     else:
         lines.append("- No commits in range.")
     lines.append("")
     return "\n".join(lines)
+
+
+def collect_commits(from_ref: str, to_ref: str) -> tuple[str, str | None]:
+    range_result = subprocess.run(
+        ["git", "log", "--oneline", f"{from_ref}..{to_ref}"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if range_result.returncode == 0:
+        return range_result.stdout.strip(), None
+
+    fallback = subprocess.run(
+        ["git", "log", "--oneline", "-20", to_ref],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if fallback.returncode == 0:
+        note = f"Source range `{from_ref}..{to_ref}` was unavailable in this checkout; showing the visible `{to_ref}` history instead."
+        return fallback.stdout.strip(), note
+
+    note = f"Commit history was unavailable for `{from_ref}..{to_ref}` in this checkout."
+    return "", note
 
 
 def current_changelog_entry(changelog: str) -> str:

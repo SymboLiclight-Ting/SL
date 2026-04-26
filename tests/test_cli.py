@@ -92,6 +92,28 @@ def test_ecosystem_scripts_smoke(tmp_path: Path) -> None:
     assert "SymbolicLight Release Notes Draft" in notes
 
 
+def test_release_notes_fallback_when_from_ref_is_missing(tmp_path: Path) -> None:
+    output = tmp_path / "release-notes.md"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "release_notes.py"),
+            "--from",
+            "missing-release-tag-for-test",
+            "--to",
+            "HEAD",
+            "--out",
+            str(output),
+        ],
+        cwd=ROOT,
+        check=False,
+    )
+    assert completed.returncode == 0
+    notes = output.read_text(encoding="utf-8")
+    assert "SymbolicLight Release Notes Draft" in notes
+    assert "Source range `missing-release-tag-for-test..HEAD` was unavailable" in notes
+
+
 def test_cli_gallery_examples_v05_regression(tmp_path: Path) -> None:
     for name in ["todo-api-cli", "notes-api", "issue-tracker", "customer-brief-generator"]:
         source = ROOT / "examples" / "gallery" / name / "app.sl"
