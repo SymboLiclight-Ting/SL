@@ -1,6 +1,6 @@
 # Vision
 
-SymbolicLight is a spec-native, AI-friendly application language.
+SymbolicLight is a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
 
 The language is built around one observation: AI can write code quickly, but real projects still need clear application structure, stable interfaces, tests, and readable generated artifacts.
 
@@ -29,7 +29,7 @@ It is an application language for:
 - JSON APIs,
 - data-backed workflows.
 
-The first backend target is Python 3.11.
+SL compiles to readable Python 3.11 so generated apps can run on the existing Python ecosystem.
 
 ## Core Bet
 

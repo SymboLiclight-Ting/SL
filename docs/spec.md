@@ -1,6 +1,8 @@
 # SymbolicLight Language Specification v0.13
 
-This document defines SymbolicLight v0.13 as a spec-native, AI-friendly application language that compiles to readable Python 3.11.
+This document defines SymbolicLight v0.13 as a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
+
+SL compiles to readable Python 3.11 so generated apps can run on the existing Python ecosystem.
 
 SymbolicLight is the formal project and brand name. Developer-facing language references should use SL. The compiler command is `slc`, and source files use the `.sl` extension.
 

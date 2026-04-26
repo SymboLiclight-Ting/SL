@@ -1,6 +1,6 @@
 # Build a Todo App
 
-This tutorial builds a small Todo application in SL, then checks, tests, and compiles it to readable Python.
+This tutorial builds a small Todo application in SL, then checks it, tests it, and builds readable Python output.
 
 By the end, the app has:
 

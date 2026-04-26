@@ -1,12 +1,14 @@
 # SymbolicLight
 
-SymbolicLight Language, or SL, is a spec-native, AI-friendly application language.
+SymbolicLight Language, or SL, is a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
 
-It is designed for developers who want application code that is easy for humans and AI tools to generate, review, test, and maintain. SL v0 focuses on small backend and CLI applications, then compiles them to readable Python 3.11.
+It is designed for developers who want application code that is easy for humans and AI tools to generate, review, test, and maintain. SL v0 focuses on explicit models, stores, routes, commands, tests, and task-spec alignment.
 
 SymbolicLight is not trying to replace Python, Rust, or TypeScript everywhere. Its first goal is narrower:
 
-> Write application intent, data models, storage, routes, commands, and tests in one compact source file, then compile to ordinary Python.
+> Write application intent, data models, storage, routes, commands, and tests in one compact source file.
+
+SL compiles to readable Python 3.11 so generated apps can run on the existing Python ecosystem.
 
 ## Naming
 
@@ -231,4 +233,4 @@ For a local `v0.13.0-rc1` release candidate, run the full release check from a c
 
 ## Project Status
 
-This is a public developer preview. The goal is to prove that a spec-native application language can compile into readable, runnable Python while keeping source code compact and AI-friendly. v0.x remains experimental and may include breaking changes before v1.0.
+This is a public developer preview. The goal is to prove that a spec-native application language can keep typed backend and CLI apps compact, testable, and AI-friendly while still producing readable, runnable Python. v0.x remains experimental and may include breaking changes before v1.0.

@@ -2,7 +2,9 @@
 
 SL is the developer-facing language name for SymbolicLight.
 
-SL is a spec-native, AI-friendly application language. It compiles `.sl` apps to readable Python 3.11 and focuses on backend and CLI applications with explicit data models, stores, routes, commands, tests, and IntentSpec alignment.
+SL is a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
+
+It focuses on explicit data models, stores, routes, commands, tests, and IntentSpec alignment. SL compiles `.sl` apps to readable Python 3.11 so they can run on the existing Python ecosystem.
 
 Start with:
 

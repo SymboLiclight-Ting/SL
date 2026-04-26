@@ -1,6 +1,6 @@
-# SymbolicLight v0.10 Semantics
+# SymbolicLight v0.13 Semantics
 
-SymbolicLight v0.10 is an application language that compiles to Python.
+SymbolicLight v0.13 defines the runtime and boundary semantics for SL, a spec-native application language for typed CLI and backend apps. Generated apps are readable Python 3.11.
 
 ## Unit Boundary
 
