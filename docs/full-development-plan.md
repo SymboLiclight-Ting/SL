@@ -8,11 +8,11 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.13.0-rc1` Release Candidate 已完成。
-- 当前实现基线：`v0.13.0-rc1` release candidate。
-- 当前 tag：`v0.13.0-rc1` 已完成本地 fresh release 演练。
-- 当前工作树：v0.13 release candidate 已收口。
-- 发布状态：`v0.13.0-rc1` 已完成，未上传 TestPyPI 或 PyPI。
+- 当前版本状态：`v0.13.0-rc2` Release Candidate 正在收口。
+- 当前实现基线：`v0.13.0-rc2` release candidate。
+- 当前 tag：准备打 `v0.13.0-rc2`。
+- 当前工作树：v0.13 release candidate 正在做定位文案和包元数据补发。
+- 发布状态：`v0.13.0rc1` 已上传 TestPyPI；`v0.13.0rc2` 准备用于同步更新后的公开定位文案。
 - 下一 release 动作：进入 v1.0 Stable 规划，确定最终兼容承诺、公开发布策略和 v1.0 blocker 处理顺序。
 
 按“成熟语言 100%”口径估算：

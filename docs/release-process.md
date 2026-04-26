@@ -12,7 +12,7 @@ python scripts/vscode_check.py
 python scripts/freeze_check.py
 python scripts/example_matrix.py
 python scripts/release_check.py
-git tag v0.13.0-rc1
+git tag v0.13.0-rc2
 python scripts/release_check.py
 ```
 

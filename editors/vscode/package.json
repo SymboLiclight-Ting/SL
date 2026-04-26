@@ -2,7 +2,7 @@
   "name": "symboliclight-vscode",
   "displayName": "SymbolicLight SL",
   "description": "Developer preview support for SL files.",
-  "version": "0.13.0-rc1",
+  "version": "0.13.0-rc2",
   "publisher": "symboliclight",
   "engines": {
     "vscode": "^1.85.0"

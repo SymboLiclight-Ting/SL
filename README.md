@@ -63,7 +63,7 @@ The v0.13 release candidate supports:
 Install the v0.13 release candidate from TestPyPI:
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple symboliclight==0.13.0rc1
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple symboliclight==0.13.0rc2
 ```
 
 Or install from a local checkout for development:
@@ -229,7 +229,7 @@ python scripts/release_notes.py --from v0.12.0-rc1 --to HEAD --out build/release
 python scripts/release_check.py
 ```
 
-For a local `v0.13.0-rc1` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
+For a local `v0.13.0-rc2` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
 
 ## Project Status
 

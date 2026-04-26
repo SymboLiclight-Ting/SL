@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.13.0rc2
+
+- Refined public positioning language across README, docs, and package metadata.
+- Reframed readable Python output as the implementation target and ecosystem bridge, not the primary product claim.
+
 ## v0.13.0rc1
 
 - Added the v1.0 freeze candidate document for syntax, CLI, JSON, and generated HTTP surfaces.

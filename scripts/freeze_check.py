@@ -69,15 +69,15 @@ def main() -> int:
                 errors.append(f"freeze doc missing JSON field: {surface}")
 
     pyproject = PYPROJECT.read_text(encoding="utf-8")
-    if 'version = "0.13.0rc1"' not in pyproject:
-        errors.append("pyproject.toml version must be 0.13.0rc1 for v0.13 RC")
+    if 'version = "0.13.0rc2"' not in pyproject:
+        errors.append("pyproject.toml version must be 0.13.0rc2 for v0.13 RC")
     changelog = CHANGELOG.read_text(encoding="utf-8")
-    if "## v0.13.0rc1" not in changelog:
-        errors.append("CHANGELOG.md missing v0.13.0rc1 entry")
+    if "## v0.13.0rc2" not in changelog:
+        errors.append("CHANGELOG.md missing v0.13.0rc2 entry")
 
     release_process = (ROOT / "docs" / "release-process.md").read_text(encoding="utf-8")
-    if "v0.13.0-rc1" not in release_process:
-        errors.append("docs/release-process.md must mention v0.13.0-rc1")
+    if "v0.13.0-rc2" not in release_process:
+        errors.append("docs/release-process.md must mention v0.13.0-rc2")
 
     compatibility = (ROOT / "docs" / "compatibility.md").read_text(encoding="utf-8")
     if "v0.13" not in compatibility:
