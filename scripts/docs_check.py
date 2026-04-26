@@ -19,6 +19,7 @@ def main() -> int:
     for required in [
         "index.md",
         "quickstart.md",
+        "tutorial.md",
         "language-tour.md",
         "app-kit.md",
         "database.md",

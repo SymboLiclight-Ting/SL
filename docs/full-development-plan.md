@@ -55,7 +55,7 @@ SymbolicLight 达到 100% 成熟度时，应满足以下条件：
 | 30% 到 36% | v0.3 Reliable Compiler | 已完成 | parser recovery、strict checker、source map、cache、CLI polish |
 | 36% 到 40% | v0.4 Standard App Kit | 已完成 | typed route body、Response、fixtures、schema、config、stdlib thin wrappers |
 | 40% 到 42% | v0.5 到 v0.8 Public Preview Hardening | 已完成 | LSP、gallery、IntentSpec、small-admin、schema diff、release RC |
-| 42% 到 50% | v0.9 DX Stabilization | 当前完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
+| 42% 到 50% | v0.9 DX Stabilization | 已完成 | comment-preserving formatter、LSP polish、compat fixtures、doctor JSON |
 | 50% 到 60% | v0.10 Production App Kit | 已完成 | Postgres、migration plan、auth helper pattern、project-ops-api |
 | 60% 到 70% | v0.11 Ecosystem Preview | 已完成 | docs site、template gallery、contribution path、release docs |
 | 70% 到 80% | v0.12 Beta | 已完成 | compatibility suite、security review、cross-platform install |

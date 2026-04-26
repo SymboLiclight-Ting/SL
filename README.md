@@ -58,6 +58,14 @@ The v0.13 release candidate supports:
 
 ## Quick Start
 
+Install the v0.13 release candidate from TestPyPI:
+
+```bash
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple symboliclight==0.13.0rc1
+```
+
+Or install from a local checkout for development:
+
 ```bash
 pip install -e ".[dev]"
 slc check examples/todo_app.sl
@@ -92,6 +100,8 @@ python build/todo_app.py add "Buy milk"
 slc new api my-api --template todo --backend sqlite
 slc check my-api/src/app.sl
 ```
+
+For a guided first app, read [Build a Todo App](docs/site/tutorial.md). For a compact syntax overview, read [Language Tour](docs/site/language-tour.md).
 
 ## Example
 

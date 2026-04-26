@@ -7,6 +7,7 @@ SL is a spec-native, AI-friendly application language. It compiles `.sl` apps to
 Start with:
 
 - [Quickstart](quickstart.md)
+- [Build a Todo App](tutorial.md)
 - [Language Tour](language-tour.md)
 - [App Kit](app-kit.md)
 - [Database](database.md)
