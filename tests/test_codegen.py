@@ -1,12 +1,15 @@
 from pathlib import Path
 import http.client
+import importlib.util
 import json
 import os
 import py_compile
+import queue
 import sqlite3
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -274,15 +277,8 @@ app HttpBody {
 
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
     py_compile.compile(str(output), doraise=True)
-    server = subprocess.Popen(
-        [sys.executable, str(output), "serve", "--port", str(port)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env={**os.environ, "SL_DB": str(db_path)},
-    )
+    server, thread = start_generated_http_server(output, port, env={"SL_DB": str(db_path)})
     try:
-        wait_for_server(port, server)
         request = urllib.request.Request(
             f"http://127.0.0.1:{port}/todos",
             data=b'{"title": "Buy milk"}',
@@ -355,8 +351,7 @@ app HttpBody {
             error_payload = json.loads(exc.read().decode("utf-8"))
             assert error_payload["error"]["code"] == "method_not_allowed"
     finally:
-        server.terminate()
-        server.wait(timeout=10)
+        stop_generated_http_server(server, thread)
 
 
 def test_generated_http_runtime_exception_returns_stable_error(tmp_path: Path) -> None:
@@ -377,14 +372,9 @@ app RuntimeHttpError {
 
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
     py_compile.compile(str(output), doraise=True)
-    server = subprocess.Popen(
-        [sys.executable, str(output), "serve", "--port", str(port)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    db_path = tmp_path / "runtime_http_error.sqlite"
+    server, thread = start_generated_http_server(output, port, env={"SL_DB": str(db_path)})
     try:
-        wait_for_server(port, server)
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/boom", timeout=5)
             raise AssertionError("expected runtime exception to fail")
@@ -397,8 +387,7 @@ app RuntimeHttpError {
                 }
             }
     finally:
-        server.terminate()
-        server.wait(timeout=10)
+        stop_generated_http_server(server, thread)
 
 
 def test_generated_http_reads_request_headers(tmp_path: Path) -> None:
@@ -427,15 +416,13 @@ app HeaderAuth {
 
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
     py_compile.compile(str(output), doraise=True)
-    server = subprocess.Popen(
-        [sys.executable, str(output), "serve", "--port", str(port)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env={**os.environ, "ADMIN_TOKEN": "secret"},
+    db_path = tmp_path / "header_auth.sqlite"
+    server, thread = start_generated_http_server(
+        output,
+        port,
+        env={"ADMIN_TOKEN": "secret", "SL_DB": str(db_path)},
     )
     try:
-        wait_for_server(port, server)
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/secure", timeout=5)
             raise AssertionError("expected missing auth to fail")
@@ -451,8 +438,7 @@ app HeaderAuth {
             assert response.status == 200
             assert json.loads(response.read().decode("utf-8")) == "ok"
     finally:
-        server.terminate()
-        server.wait(timeout=10)
+        stop_generated_http_server(server, thread)
 
 
 def test_generated_tests_load_fixtures_and_check_golden(tmp_path: Path) -> None:
@@ -748,14 +734,9 @@ app ResponseHelpers {
     assert not [diagnostic for diagnostic in diagnostics if diagnostic.severity == "error"]
     py_compile.compile(str(output), doraise=True)
     port = free_port()
-    proc = subprocess.Popen(
-        [sys.executable, str(output), "serve", "--port", str(port)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    db_path = tmp_path / "response_helpers.sqlite"
+    server, thread = start_generated_http_server(output, port, env={"SL_DB": str(db_path)})
     try:
-        wait_for_server(port, proc)
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/ok", timeout=5) as response:
             assert response.status == 201
             assert json.loads(response.read().decode("utf-8")) == {"ok": {"title": "created"}}
@@ -768,8 +749,7 @@ app ResponseHelpers {
                 "err": {"code": "not_found", "message": "Missing item."}
             }
     finally:
-        proc.terminate()
-        proc.wait(timeout=5)
+        stop_generated_http_server(server, thread)
 
 
 def test_generated_schema_drift_does_not_overwrite_existing_hash(tmp_path: Path) -> None:
@@ -828,19 +808,100 @@ def free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def wait_for_server(port: int, process: subprocess.Popen | None = None) -> None:
+def start_generated_http_server(
+    output: Path,
+    port: int,
+    *,
+    env: dict[str, str] | None = None,
+) -> tuple[object, threading.Thread]:
+    module = load_generated_module(output, env=env)
+    errors: queue.Queue[BaseException] = queue.Queue()
+    ready = threading.Event()
+    server_holder: dict[str, object] = {}
+    original_http_server = module.HTTPServer
+
+    class TrackingHTTPServer(original_http_server):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            super().__init__(*args, **kwargs)
+            server_holder["server"] = self
+            ready.set()
+
+    def run() -> None:
+        module.HTTPServer = TrackingHTTPServer
+        old_env = patch_env(env)
+        try:
+            module.serve("127.0.0.1", port)
+        except BaseException as exc:
+            errors.put(exc)
+            ready.set()
+        finally:
+            restore_env(old_env)
+            module.HTTPServer = original_http_server
+            server = server_holder.get("server")
+            if server is not None:
+                server.server_close()
+            connection = getattr(module, "CONN", None)
+            if connection is not None:
+                connection.close()
+                module.CONN = None
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+
+    if not ready.wait(timeout=15):
+        raise AssertionError("server thread did not create an HTTP server")
+    if not errors.empty():
+        raise AssertionError(f"server thread exited during startup: {errors.get()!r}")
+
+    server = server_holder.get("server")
+    if server is None:
+        raise AssertionError("server thread did not expose an HTTP server")
+    wait_for_server(port)
+    return server, thread
+
+
+def stop_generated_http_server(server: object, thread: threading.Thread) -> None:
+    server.shutdown()
+    thread.join(timeout=5)
+    if thread.is_alive():
+        raise AssertionError("server thread did not stop")
+
+
+def load_generated_module(output: Path, *, env: dict[str, str] | None = None) -> object:
+    old_env = patch_env(env)
+    try:
+        module_name = f"_sl_generated_{output.stem}_{time.time_ns()}"
+        spec = importlib.util.spec_from_file_location(module_name, output)
+        if spec is None or spec.loader is None:
+            raise AssertionError(f"could not load generated module: {output}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        restore_env(old_env)
+
+
+def patch_env(env: dict[str, str] | None) -> dict[str, str | None]:
+    old_env: dict[str, str | None] = {}
+    for key, value in (env or {}).items():
+        old_env[key] = os.environ.get(key)
+        os.environ[key] = value
+    return old_env
+
+
+def restore_env(old_env: dict[str, str | None]) -> None:
+    for key, value in old_env.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+def wait_for_server(port: int) -> None:
     deadline = time.time() + 15
     last_error: OSError | None = None
     while time.time() < deadline:
-        if process is not None and process.poll() is not None:
-            stdout = process.stdout.read() if process.stdout is not None else ""
-            stderr = process.stderr.read() if process.stderr is not None else ""
-            raise AssertionError(
-                "server exited before accepting connections"
-                f"\nexit code: {process.returncode}"
-                f"\nstdout:\n{stdout}"
-                f"\nstderr:\n{stderr}"
-            )
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=0.2):
                 return
