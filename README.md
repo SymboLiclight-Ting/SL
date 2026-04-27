@@ -2,7 +2,7 @@
 
 SymbolicLight Language, or SL, is a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
 
-It is designed for developers who want application code that is easy for humans and AI tools to generate, review, test, and maintain. SL v0 focuses on explicit models, stores, routes, commands, tests, and task-spec alignment.
+It is designed for developers who want application code that is easy for humans and AI tools to generate, review, test, and maintain. SL v1.0 focuses on explicit models, stores, routes, commands, tests, and task-spec alignment.
 
 SymbolicLight is not trying to replace Python, Rust, or TypeScript everywhere. Its first goal is narrower:
 
@@ -19,9 +19,9 @@ SL compiles to readable Python 3.11 so generated apps can run on the existing Py
 
 Use SymbolicLight in project, website, release, and positioning text. Use SL in developer docs, examples, tutorials, and day-to-day language references.
 
-## Current Release Candidate
+## Current Stable Baseline
 
-The v0.13 release candidate supports:
+SL v1.0 supports:
 
 - `app` declarations.
 - `module` declarations and explicit `import "./file.sl" as name`.
@@ -45,7 +45,7 @@ The v0.13 release candidate supports:
 - JSON diagnostics for tools through `slc check --json`.
 - machine-readable doctor reports through `slc doctor --json`.
 - read-only migration plans through `slc migrate plan`.
-- developer-preview LSP through `slc lsp`.
+- local LSP support through `slc lsp`.
 - local VS Code syntax, snippets, and language-server wiring under `editors/vscode`.
 - local playground under `playground/`.
 - IntentSpec-aware `slc doctor` route, command, and permission alignment hints.
@@ -60,16 +60,17 @@ The v0.13 release candidate supports:
 
 ## Quick Start
 
-Install the v0.13 release candidate from TestPyPI:
-
-```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple symboliclight==0.13.0rc2
-```
-
-Or install from a local checkout for development:
+Install from a local checkout for development:
 
 ```bash
 pip install -e ".[dev]"
+```
+
+After building a local v1.0 package, install the wheel directly:
+
+```bash
+python -m build
+pip install dist/symboliclight-1.0.0-py3-none-any.whl
 slc check examples/todo_app.sl
 slc check examples/todo_app.sl --json
 slc build examples/todo_app.sl --out build/todo_app.py
@@ -225,12 +226,12 @@ python scripts/freeze_check.py
 python scripts/example_matrix.py
 python -m build
 python scripts/package_smoke.py --gallery
-python scripts/release_notes.py --from v0.12.0-rc1 --to HEAD --out build/release-notes.md
+python scripts/release_notes.py --from v0.13.0-rc2 --to HEAD --out build/release-notes-v1.0.0.md
 python scripts/release_check.py
 ```
 
-For a local `v0.13.0-rc2` release candidate, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No TestPyPI or PyPI upload is performed by these commands.
+For the local `v1.0.0` baseline, run the full release check from a clean worktree. The check builds a local wheel, installs it into a temporary environment, runs installed `slc` against the gallery, exercises a `doctor --db` fixture where the stored schema hash matches but the SQLite structure is missing a column, runs migration-plan smoke checks, and runs compatibility fixtures for prior v0.x examples. No GitHub, TestPyPI, or PyPI upload is performed by these commands.
 
 ## Project Status
 
-This is a public developer preview. The goal is to prove that a spec-native application language can keep typed backend and CLI apps compact, testable, and AI-friendly while still producing readable, runnable Python. v0.x remains experimental and may include breaking changes before v1.0.
+This repository is prepared as a local v1.0 stable baseline. The goal is to keep typed backend and CLI apps compact, testable, and AI-friendly while still producing readable, runnable Python. Public redistribution is a separate owner decision after reviewing the local release artifacts.

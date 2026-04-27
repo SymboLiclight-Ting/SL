@@ -1,6 +1,6 @@
 # Compatibility Policy
 
-SymbolicLight is currently in the `v0.x` experimental period.
+SymbolicLight is the project and brand name. SL is the developer-facing language name. SL v1.0 is the stable local baseline for the surfaces listed in `docs/freeze-candidate.md`.
 
 ## v0.x
 
@@ -16,20 +16,20 @@ The compiler should reject old syntax with actionable diagnostics whenever pract
 
 ## v1.0
 
-After `v1.0`, the following surfaces are considered stable:
+Starting with `v1.0`, the following surfaces are considered stable:
 
 - core syntax,
 - type names and generic arity,
 - store method names and signatures,
 - CLI command behavior,
-- generated Python runtime contract,
+- generated Python user-visible runtime contract,
 - formatter output.
 
-Breaking changes after `v1.0` require a documented migration path.
+Breaking changes after `v1.0` require a documented migration path, an entry in `CHANGELOG.md`, and a regression or compatibility fixture. Generated Python may change internally, but its documented CLI behavior, HTTP error envelope, source backreferences, and database drift reports remain stable.
 
 ## Current Stability
 
-Stable enough to build examples:
+Stable:
 
 - `app`
 - `module`
@@ -42,13 +42,23 @@ Stable enough to build examples:
 - `route`
 - `test`
 
-Still experimental:
+Still experimental or explicitly outside the v1.0 guarantee:
 
 - `Result<T, E>` expression ergonomics,
 - IntentSpec acceptance execution beyond the v0.6 offline bridge,
 - permissions enforcement,
 - source-map behavior beyond v0.3 sidecar maps and best-effort runtime backreferences,
 - standard library APIs beyond SQLite, CLI, JSON HTTP, and tests.
+
+## v1.0 Notes
+
+v1.0 promotes the v0.13 freeze-candidate language, CLI, JSON, and generated HTTP surfaces without adding new `.sl` syntax:
+
+- v0.6 through v0.13 compatibility fixtures remain part of the release gate,
+- publication to GitHub, TestPyPI, or PyPI is not automated and remains an explicit owner decision,
+- local release artifacts include sdist, wheel, release notes, and an announcement draft,
+- LSP hover and definition support is improved for local `let` values and inferred record fields,
+- automatic migrations, production HTTP process management, package registry, macro system, auth/session middleware, and native compiler work remain deferred.
 
 ## v0.3 Notes
 

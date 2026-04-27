@@ -69,19 +69,19 @@ def main() -> int:
                 errors.append(f"freeze doc missing JSON field: {surface}")
 
     pyproject = PYPROJECT.read_text(encoding="utf-8")
-    if 'version = "0.13.0rc2"' not in pyproject:
-        errors.append("pyproject.toml version must be 0.13.0rc2 for v0.13 RC")
+    if 'version = "1.0.0"' not in pyproject:
+        errors.append("pyproject.toml version must be 1.0.0 for v1.0")
     changelog = CHANGELOG.read_text(encoding="utf-8")
-    if "## v0.13.0rc2" not in changelog:
-        errors.append("CHANGELOG.md missing v0.13.0rc2 entry")
+    if "## v1.0.0" not in changelog:
+        errors.append("CHANGELOG.md missing v1.0.0 entry")
 
     release_process = (ROOT / "docs" / "release-process.md").read_text(encoding="utf-8")
-    if "v0.13.0-rc2" not in release_process:
-        errors.append("docs/release-process.md must mention v0.13.0-rc2")
+    if "v1.0.0" not in release_process:
+        errors.append("docs/release-process.md must mention v1.0.0")
 
     compatibility = (ROOT / "docs" / "compatibility.md").read_text(encoding="utf-8")
-    if "v0.13" not in compatibility:
-        errors.append("docs/compatibility.md missing v0.13 compatibility notes")
+    if "v1.0" not in compatibility:
+        errors.append("docs/compatibility.md missing v1.0 compatibility notes")
 
     for path in sorted((ROOT / "tests" / "compat").glob("v0_12/*/app.sl")):
         if not re.match(r"^[a-z0-9_-]+$", path.parent.name):
@@ -94,7 +94,7 @@ def main() -> int:
         print(f"error: {error}", file=sys.stderr)
     if errors:
         return 1
-    print("ok - freeze candidate check passed")
+    print("ok - stable surface check passed")
     return 0
 
 

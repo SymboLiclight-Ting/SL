@@ -1,6 +1,6 @@
-# SymbolicLight v0.13 Semantics
+# SL v1.0 Semantics
 
-SymbolicLight v0.13 defines the runtime and boundary semantics for SL, a spec-native application language for typed CLI and backend apps. Generated apps are readable Python 3.11.
+SL v1.0 defines the runtime and boundary semantics for a spec-native application language from the SymbolicLight project. Generated apps are readable Python 3.11.
 
 ## Unit Boundary
 
@@ -164,9 +164,9 @@ Files containing `//` comments are rewritten only when comments can be preserved
 
 The local playground compiles submitted `.sl` source to Python or diagnostics JSON. It is a preview tool and not a production runtime.
 
-## v0.13 Release Candidate Boundary
+## v1.0 Stable Boundary
 
-v0.13 is a compatibility and release-candidate phase. It does not add semantic constructs. The v0.13 work treats the existing route, store, response, diagnostics, doctor, migrate, and generated HTTP error behavior as a freeze candidate for v1.0.
+v1.0 promotes the v0.13 route, store, response, diagnostics, doctor, migrate, and generated HTTP error behavior to the local stable baseline. It does not add semantic constructs beyond the release-candidate surface.
 
 If implementation hardening changes observable behavior, the change must be documented as a compatibility note and covered by a regression fixture before release.
 

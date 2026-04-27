@@ -31,7 +31,7 @@
 - Run `python scripts/package_smoke.py --gallery`.
 - Run `python scripts/package_smoke.py --gallery --python path/to/python` when checking a specific Python interpreter.
 - Run `python scripts/release_check.py` for the full package-inclusive release gate.
-- Run `python scripts/release_notes.py --from v0.12.0-rc1 --to HEAD --out build/release-notes.md`.
-- For release candidates, build with a PEP 440 pre-release version such as `0.13.0rc1`.
-- For v0.13 RC, confirm `docs/freeze-candidate.md`, `docs/migration/v0_12_to_v0_13.md`, and `docs/v1-blockers.md` are current.
-- Upload only when the project owner explicitly chooses TestPyPI or PyPI publishing.
+- Run `python scripts/release_notes.py --from v0.13.0-rc2 --to HEAD --out build/release-notes-v1.0.0.md`.
+- For v1.0, build with the PEP 440 version `1.0.0`.
+- Confirm `docs/freeze-candidate.md`, `docs/compatibility.md`, `docs/migration/v1_0_readiness.md`, and `docs/v1-blockers.md` are current.
+- Upload to GitHub, TestPyPI, or PyPI only when the project owner explicitly chooses public publishing.

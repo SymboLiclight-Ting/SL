@@ -28,7 +28,7 @@ def render_release_notes(from_ref: str, to_ref: str) -> str:
     commits, commit_note = collect_commits(from_ref, to_ref)
     version_block = current_changelog_entry(changelog)
     lines = [
-        "# SymbolicLight Release Notes Draft",
+        "# SL Release Notes Draft",
         "",
         "## Changelog",
         "",

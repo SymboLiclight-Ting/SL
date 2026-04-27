@@ -8,26 +8,26 @@ SymbolicLight 是正式项目名。开发者入口统一使用 SL、`slc`、`.sl
 
 截至当前仓库状态：
 
-- 当前版本状态：`v0.13.0-rc2` Release Candidate 正在收口。
-- 当前实现基线：`v0.13.0-rc2` release candidate。
-- 当前 tag：准备打 `v0.13.0-rc2`。
-- 当前工作树：v0.13 release candidate 正在做定位文案和包元数据补发。
-- 发布状态：`v0.13.0rc1` 已上传 TestPyPI；`v0.13.0rc2` 准备用于同步更新后的公开定位文案。
-- 下一 release 动作：进入 v1.0 Stable 规划，确定最终兼容承诺、公开发布策略和 v1.0 blocker 处理顺序。
+- 当前版本状态：`v1.0.0` 本地稳定基线正在收口。
+- 当前实现基线：SL v1.0.0 local stable baseline。
+- 当前 tag：准备本地 `v1.0.0` tag，不推送。
+- 当前工作树：v1.0 本地完整发布包正在做版本、文档、检查脚本和发布产物收口。
+- 发布状态：公开入口保持关闭；GitHub、TestPyPI、PyPI 发布均需项目 owner 另行明确授权。
+- 下一 release 动作：完成本地 sdist、wheel、release notes、announcement draft 和 fresh tag 演练。
 
 按“成熟语言 100%”口径估算：
 
 ```text
 当前整体成熟度：约 90%
 当前公开试用准备度：约 98%
-当前 v0.13 release candidate 完成度：100%
+当前 v1.0 本地完整发布包完成度：进行中
 ```
 
 这三个数字代表不同层级：
 
 - 整体成熟度看的是能否成为稳定、可长期使用、生态完整的应用开发语言。
 - 公开试用准备度看的是外部开发者能否安装、跑示例、理解定位、提交反馈。
-- v0.13 release candidate 完成度看的是当前阶段目标是否完成。
+- v1.0 本地完整发布包完成度看的是当前阶段目标是否完成。
 
 ## 100% 成熟定义
 

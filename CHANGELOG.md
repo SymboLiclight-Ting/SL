@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.0
+
+- Promoted the SL v0.13 release candidate surfaces to the v1.0 stable local release baseline.
+- Standardized naming so SL is the developer-facing language name and SymbolicLight is the project and brand name.
+- Updated local release checks, package metadata, and VS Code preview metadata for `1.0.0`.
+- Improved LSP hover and definition support for local `let` values and record fields inferred from store and helper expressions.
+- Added local-only v1.0 release notes and announcement preparation while keeping public upload steps manual.
+
 ## v0.13.0rc2
 
 - Refined public positioning language across README, docs, and package metadata.

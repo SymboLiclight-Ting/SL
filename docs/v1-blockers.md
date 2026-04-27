@@ -1,6 +1,6 @@
-# v1.0 Blocker List
+# v1.0 Completion Checklist
 
-This list is the v0.13 release-candidate gate for deciding what must happen before SymbolicLight can become v1.0.
+This list tracks what must remain true for SL v1.0 to stay release-ready locally.
 
 ## Blockers
 
@@ -8,7 +8,7 @@ This list is the v0.13 release-candidate gate for deciding what must happen befo
 - Keep compatibility fixtures for all supported v0.6 and later examples passing.
 - Make docs, examples, and generated Python behavior agree for every public command.
 - Keep local wheel smoke checks passing from a fresh tag checkout.
-- Decide the official PyPI/TestPyPI publication policy.
+- Keep public package upload as an explicit owner decision.
 
 ## Nice To Have Before v1.0
 

@@ -89,7 +89,7 @@ def test_ecosystem_scripts_smoke(tmp_path: Path) -> None:
         completed = subprocess.run(command, cwd=ROOT, check=False)
         assert completed.returncode == 0
     notes = (tmp_path / "release-notes.md").read_text(encoding="utf-8")
-    assert "SymbolicLight Release Notes Draft" in notes
+    assert "SL Release Notes Draft" in notes
 
 
 def test_release_notes_fallback_when_from_ref_is_missing(tmp_path: Path) -> None:
@@ -110,7 +110,7 @@ def test_release_notes_fallback_when_from_ref_is_missing(tmp_path: Path) -> None
     )
     assert completed.returncode == 0
     notes = output.read_text(encoding="utf-8")
-    assert "SymbolicLight Release Notes Draft" in notes
+    assert "SL Release Notes Draft" in notes
     assert "Source range `missing-release-tag-for-test..HEAD` was unavailable" in notes
 
 

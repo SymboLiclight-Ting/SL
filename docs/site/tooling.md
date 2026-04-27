@@ -21,7 +21,7 @@ The formatter preserves common `//` comment trivia in v0.9.
 
 The language server provides diagnostics, hover, definition, document symbols, and formatting through JSON-RPC stdio.
 
-The VS Code preview extension lives under `editors/vscode/`.
+The local VS Code extension lives under `editors/vscode/`.
 
 Maintenance scripts:
 
@@ -34,9 +34,9 @@ python scripts/compat_check.py
 python scripts/release_check.py --fast
 python scripts/cross_platform_smoke.py
 python scripts/package_smoke.py --gallery --python path/to/python
-python scripts/release_notes.py --from v0.12.0-rc1 --to HEAD --out build/release-notes.md
+python scripts/release_notes.py --from v0.13.0-rc2 --to HEAD --out build/release-notes-v1.0.0.md
 ```
 
-v0.13 release checks include freeze-candidate and example-matrix validation in addition to the v0.12 CI-style gates.
+v1.0 release checks include stable-surface and example-matrix validation in addition to the v0.12 CI-style gates.
 
 `slc` uses stable exit codes in v0.12: `0` for success or warnings, `1` for compiler/runtime/test/doctor/migrate failures, and `2` for CLI argument errors from `argparse`.

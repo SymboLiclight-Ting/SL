@@ -217,8 +217,20 @@ Deferred from v0.13:
 
 ## v1.0 Stable
 
+Implemented:
+
 - syntax freeze,
 - core standard library stability,
 - stable CLI behavior,
 - documented compatibility guarantees,
-- real project case studies.
+- local package artifact rehearsal,
+- LSP hover and definition polish for inferred local values.
+
+Deferred beyond v1.0:
+
+- public package upload,
+- automatic migrations,
+- production HTTP process management,
+- package registry,
+- macro system,
+- native compiler.

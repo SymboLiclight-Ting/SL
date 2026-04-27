@@ -23,8 +23,8 @@ def main() -> int:
         grammars = contributes.get("grammars", [])
         if not any(grammar.get("scopeName") == "source.sl" for grammar in grammars):
             errors.append("VS Code grammar must use scopeName source.sl")
-        if package.get("version") != "0.13.0-rc2":
-            errors.append("VS Code extension version must be 0.13.0-rc2")
+        if package.get("version") != "1.0.0":
+            errors.append("VS Code extension version must be 1.0.0")
     if snippets is not None and not snippets:
         errors.append("VS Code snippets file must not be empty")
     extension = VSCODE / "extension.js"

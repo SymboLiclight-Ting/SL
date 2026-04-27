@@ -1,6 +1,6 @@
-# SymbolicLight Language Specification v0.13
+# SL Language Specification v1.0
 
-This document defines SymbolicLight v0.13 as a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
+This document defines SL v1.0 as a spec-native, AI-friendly application language from the SymbolicLight project for building typed CLI and backend apps with less glue code.
 
 SL compiles to readable Python 3.11 so generated apps can run on the existing Python ecosystem.
 
@@ -385,11 +385,11 @@ severity + code + message + file + line + column + suggestion
 
 Parser diagnostics use `SLP...` codes. Checker diagnostics use `SLC...` codes. Lexer diagnostics use `SLL...` codes.
 
-## v0.13 Freeze Candidate
+## v1.0 Stable Surface
 
-v0.13 does not add `.sl` syntax. It identifies the current public language, CLI, JSON, and generated HTTP surfaces as a freeze candidate for v1.0. The authoritative list lives in `docs/freeze-candidate.md`.
+v1.0 does not add `.sl` syntax beyond the v0.13 release-candidate surface. It promotes the current public language, CLI, JSON, and generated HTTP surfaces to the local stable baseline. The authoritative list lives in `docs/freeze-candidate.md`.
 
-Any compatibility-affecting change during v0.13 must update this specification, `docs/compatibility.md`, `CHANGELOG.md`, and a regression or compatibility fixture.
+Any compatibility-affecting change after v1.0 must update this specification, `docs/compatibility.md`, `CHANGELOG.md`, and a regression or compatibility fixture.
 
 ## Out Of Scope Before v1.0
 

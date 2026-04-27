@@ -1,25 +1,25 @@
-# SL Developer Preview
+# SL Local v1.0 Baseline
 
-SL v0.13 is a release-candidate preview. It is usable for experiments, examples, and early feedback, but v0.x remains compatibility-flexible until v1.0.
+SL v1.0 is the local stable baseline for the current compiler, app kit, CLI, and developer tooling. Public redistribution is a separate owner decision.
 
 ## What Is Ready
 
 - Compile `.sl` apps to readable Python 3.11.
 - Build small CLI and JSON HTTP applications.
 - Use SQLite stores, optional Postgres stores, typed routes, fixtures, golden tests, and JSON schema generation.
-- Run `slc lsp` for editor diagnostics and basic navigation.
-- Try the local VS Code preview extension and playground.
+- Run `slc lsp` for editor diagnostics and navigation.
+- Try the local VS Code extension and playground.
 - Run `slc doctor` to compare SL route and command hints against implementation.
 - Run `slc migrate plan` for read-only database structure planning.
 - Generate starter apps with `slc new api --template ... --backend ...`.
 - Run local docs, VS Code, and release notes checks.
 
-## What Is Not Stable Yet
+## What Is Not Part Of The v1.0 Guarantee
 
-- Syntax and standard library APIs are now freeze candidates, but may still change before v1.0 if a release-candidate blocker requires it.
-- VS Code support is local-preview only and is not published to the marketplace.
+- VS Code support is local-only and is not published to the marketplace.
 - The playground is local-only and not a hosted product.
-- Postgres support requires optional dependencies and remains preview quality.
+- Postgres support requires optional dependencies.
+- Generated Python internals may change when documented behavior remains stable.
 
 ## Recommended Smoke Test
 

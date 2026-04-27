@@ -1,6 +1,6 @@
-# SL VS Code Preview
+# SL VS Code Support
 
-The local VS Code preview extension lives in `editors/vscode`.
+The local VS Code extension lives in `editors/vscode`.
 
 It provides:
 

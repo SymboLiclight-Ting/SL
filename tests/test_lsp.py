@@ -177,6 +177,60 @@ app Demo {
     assert enum_location["range"]["start"]["line"] == 2
 
 
+def test_lsp_hover_reports_let_variable_and_field_types(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    text = """
+app Demo {
+  type Item = { id: Id<Item>, title: Text, done: Bool, }
+  store items: Item
+  route POST "/items" -> Text {
+    let created = items.insert({ title: "Write docs", done: false })
+    let title = created.title
+    return title
+  }
+}
+"""
+
+    def hover_for(fragment: str, token_fragment: str | None = None) -> str:
+        line = next(index for index, item in enumerate(text.splitlines()) if fragment in item)
+        token_fragment = token_fragment or fragment
+        character = text.splitlines()[line].index(token_fragment) + len(token_fragment) - 1
+        hover = hover_at(source.as_uri(), text, line, character)
+        assert hover is not None
+        return json.dumps(hover)
+
+    assert "`created: Item`" in hover_for("let created", "created")
+    assert "`created.title: Text`" in hover_for("created.title")
+    assert "`title: Text`" in hover_for("return title", "title")
+
+
+def test_lsp_definition_resolves_let_variable_field(tmp_path: Path) -> None:
+    source = tmp_path / "app.sl"
+    text = """
+app Demo {
+  type Item = {
+    id: Id<Item>,
+    title: Text,
+  }
+  store items: Item
+  route POST "/items" -> Text {
+    let created = items.insert({ title: "Write docs" })
+    return created.title
+  }
+}
+"""
+    lines = text.splitlines()
+    line = next(index for index, item in enumerate(lines) if "created.title" in item)
+
+    variable_location = definition_at(source.as_uri(), text, line, lines[line].index("created"))
+    field_location = definition_at(source.as_uri(), text, line, lines[line].index("title"))
+
+    assert variable_location is not None
+    assert variable_location["range"]["start"]["line"] == 8
+    assert field_location is not None
+    assert field_location["range"]["start"]["line"] == 4
+
+
 def test_lsp_formatting_preserves_comments(tmp_path: Path) -> None:
     source = tmp_path / "app.sl"
     text = """

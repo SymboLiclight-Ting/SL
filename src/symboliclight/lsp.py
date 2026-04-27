@@ -7,7 +7,24 @@ from pathlib import Path
 from urllib.request import url2pathname
 from urllib.parse import unquote, urlparse
 
-from symboliclight.ast import App, FieldDecl, StoreDecl, TypeDecl, TypeRef, Unit
+from symboliclight.ast import (
+    App,
+    BinaryExpr,
+    CallExpr,
+    Expr,
+    FieldDecl,
+    IfStmt,
+    LetStmt,
+    ListExpr,
+    LiteralExpr,
+    Param,
+    PathExpr,
+    Stmt,
+    StoreDecl,
+    TypeDecl,
+    TypeRef,
+    Unit,
+)
 from symboliclight.checker import check_program_result
 from symboliclight.diagnostics import Diagnostic, SourceLocation
 from symboliclight.formatter import format_source
@@ -171,6 +188,10 @@ def infer_hover_type(unit: Unit, token: str, *, line: int | None = None) -> str 
         type_decl = find_type(unit, route.body_type.name)
         field = find_field(type_decl, field_name) if type_decl else None
         return field.type_ref.render() if field is not None else None
+    env = scoped_env_at_line(unit, line)
+    local_type = type_for_path_parts(unit, token.split("."), env)
+    if local_type is not None:
+        return local_type.render()
     parts = token.split(".")
     if len(parts) == 2:
         config_type = config_field_type(unit, parts[0], parts[1])
@@ -247,6 +268,17 @@ def definition_at(uri: str, text: str, line: int, character: int) -> dict[str, o
     unit = parsed_unit(uri, text)
     if unit is None:
         return None
+    part_index = token_part_index_at(text, line, character)
+    if part_index is not None and part_index > 0:
+        field = field_definition_at_line(unit, token, line)
+        if field is not None:
+            return {"uri": uri, "range": location_range(field.location)}
+    local = scoped_definition_at_line(unit, token, line)
+    if local is not None:
+        return {"uri": uri, "range": location_range(local)}
+    field = field_definition_at_line(unit, token, line)
+    if field is not None:
+        return {"uri": uri, "range": location_range(field.location)}
     location = local_definition(unit, token, uri)
     if location is not None:
         return location
@@ -374,6 +406,187 @@ def enum_variant_type(unit: Unit, enum_name: str, variant: str) -> str | None:
     return enum_name
 
 
+def scoped_env_at_line(unit: Unit, zero_based_line: int | None) -> dict[str, TypeRef]:
+    if zero_based_line is None:
+        return {}
+    scope = enclosing_scope(unit, zero_based_line)
+    if scope is None:
+        return {}
+    body, params = scope
+    env = {param.name: param.type_ref for param in params}
+    collect_let_types(unit, body, zero_based_line + 1, env)
+    return env
+
+
+def scoped_definition_at_line(unit: Unit, token: str, zero_based_line: int | None) -> SourceLocation | None:
+    if zero_based_line is None:
+        return None
+    name = token.split(".", 1)[0]
+    scope = enclosing_scope(unit, zero_based_line)
+    if scope is None:
+        return None
+    body, params = scope
+    param = next((item for item in params if item.name == name), None)
+    if param is not None:
+        return param.location
+    return latest_let_location(body, name, zero_based_line + 1)
+
+
+def field_definition_at_line(unit: Unit, token: str, zero_based_line: int | None) -> FieldDecl | None:
+    if zero_based_line is None or "." not in token:
+        return None
+    env = scoped_env_at_line(unit, zero_based_line)
+    parts = token.split(".")
+    current = env.get(parts[0])
+    field: FieldDecl | None = None
+    for part in parts[1:]:
+        type_decl = find_type(unit, current.name) if current is not None else None
+        field = find_field(type_decl, part)
+        if field is None:
+            return None
+        current = field.type_ref
+    return field
+
+
+def enclosing_scope(unit: Unit, zero_based_line: int) -> tuple[list[Stmt], list[Param]] | None:
+    one_based_line = zero_based_line + 1
+    candidates: list[tuple[int, list[Stmt], list[Param]]] = []
+    for function in unit.functions:
+        if function.location.line <= one_based_line:
+            candidates.append((function.location.line, function.body, list(function.params)))
+    if isinstance(unit, App):
+        for route in unit.routes:
+            if route.location.line <= one_based_line:
+                candidates.append((route.location.line, route.body, []))
+        for test in unit.tests:
+            if test.location.line <= one_based_line:
+                candidates.append((test.location.line, test.body, []))
+    if not candidates:
+        return None
+    _, body, params = max(candidates, key=lambda item: item[0])
+    return body, params
+
+
+def collect_let_types(unit: Unit, body: list[Stmt], one_based_line: int, env: dict[str, TypeRef]) -> None:
+    for statement in body:
+        if statement.location.line > one_based_line:
+            continue
+        if isinstance(statement, LetStmt):
+            env[statement.name] = infer_expr_type(unit, statement.expr, env)
+        elif isinstance(statement, IfStmt):
+            collect_let_types(unit, statement.then_body, one_based_line, env)
+            collect_let_types(unit, statement.else_body, one_based_line, env)
+
+
+def latest_let_location(body: list[Stmt], name: str, one_based_line: int) -> SourceLocation | None:
+    matches: list[SourceLocation] = []
+    for statement in body:
+        if statement.location.line > one_based_line:
+            continue
+        if isinstance(statement, LetStmt) and statement.name == name:
+            matches.append(statement.location)
+        elif isinstance(statement, IfStmt):
+            nested = latest_let_location(statement.then_body, name, one_based_line)
+            if nested is not None:
+                matches.append(nested)
+            nested = latest_let_location(statement.else_body, name, one_based_line)
+            if nested is not None:
+                matches.append(nested)
+    return max(matches, key=lambda location: location.line) if matches else None
+
+
+def infer_expr_type(unit: Unit, expr: Expr, env: dict[str, TypeRef]) -> TypeRef:
+    if isinstance(expr, LiteralExpr):
+        if isinstance(expr.value, bool):
+            return TypeRef("Bool")
+        if isinstance(expr.value, int):
+            return TypeRef("Int")
+        if isinstance(expr.value, float):
+            return TypeRef("Float")
+        if isinstance(expr.value, str):
+            return TypeRef("Text")
+        return TypeRef("Unknown")
+    if isinstance(expr, ListExpr):
+        return TypeRef("List", [infer_expr_type(unit, expr.items[0], env) if expr.items else TypeRef("Unknown")])
+    if isinstance(expr, BinaryExpr):
+        return TypeRef("Bool")
+    if isinstance(expr, PathExpr):
+        return type_for_path_parts(unit, expr.parts, env) or TypeRef("Unknown")
+    if isinstance(expr, CallExpr):
+        return infer_call_type(unit, expr, env)
+    return TypeRef("Unknown")
+
+
+def infer_call_type(unit: Unit, expr: CallExpr, env: dict[str, TypeRef]) -> TypeRef:
+    if expr.callee == ["request", "header"]:
+        return TypeRef("Option", [TypeRef("Text")])
+    if len(expr.callee) == 2:
+        store_type = store_method_type(unit, expr.callee[0], expr.callee[1])
+        if store_type is not None:
+            return store_type
+    if len(expr.callee) == 1:
+        name = expr.callee[0]
+        first = infer_expr_type(unit, expr.args[0].expr, env) if expr.args else TypeRef("Unknown")
+        if name == "some":
+            return TypeRef("Option", [first])
+        if name == "none":
+            return TypeRef("Option", [TypeRef("Unknown")])
+        if name == "ok":
+            return TypeRef("Result", [first, TypeRef("Unknown")])
+        if name == "err":
+            return TypeRef("Result", [TypeRef("Unknown"), first])
+        if name in {"env", "uuid", "now", "read_text"}:
+            return TypeRef("Text")
+        if name == "env_int":
+            return TypeRef("Int")
+        if name == "write_text":
+            return TypeRef("Bool")
+        if name == "response":
+            body = builtin_arg_expr(expr, "body", positional_index=1)
+            return TypeRef("Response", [infer_expr_type(unit, body, env) if body is not None else TypeRef("Unknown")])
+        if name == "response_ok":
+            body = builtin_arg_expr(expr, "body", positional_index=1)
+            ok_type = infer_expr_type(unit, body, env) if body is not None else TypeRef("Unknown")
+            return TypeRef("Response", [TypeRef("Result", [ok_type, TypeRef("Unknown")])])
+        if name == "response_err":
+            body = builtin_arg_expr(expr, "body", positional_index=1)
+            err_type = infer_expr_type(unit, body, env) if body is not None else TypeRef("Unknown")
+            return TypeRef("Response", [TypeRef("Result", [TypeRef("Unknown"), err_type])])
+        function = next((item for item in unit.functions if item.name == name), None)
+        if function is not None:
+            return function.return_type
+        if name in {item.name for item in unit.types}:
+            return TypeRef(name)
+    if expr.callee and expr.callee[0] in unit.imported_modules:
+        imported = unit.imported_modules[expr.callee[0]]
+        function = next((item for item in imported.functions if item.name == expr.callee[1]), None) if len(expr.callee) == 2 else None
+        if function is not None:
+            return function.return_type
+    return TypeRef("Unknown")
+
+
+def builtin_arg_expr(expr: CallExpr, name: str, *, positional_index: int) -> Expr | None:
+    for index, arg in enumerate(expr.args):
+        if arg.name == name or (arg.name is None and index == positional_index):
+            return arg.expr
+    return None
+
+
+def type_for_path_parts(unit: Unit, parts: list[str], env: dict[str, TypeRef]) -> TypeRef | None:
+    if not parts:
+        return None
+    current = env.get(parts[0])
+    if current is None:
+        return None
+    for part in parts[1:]:
+        type_decl = find_type(unit, current.name)
+        field = find_field(type_decl, part) if type_decl is not None else None
+        if field is None:
+            return None
+        current = field.type_ref
+    return current
+
+
 def route_at_line(unit: App, zero_based_line: int | None) -> object | None:
     if zero_based_line is None:
         return None
@@ -392,6 +605,18 @@ def token_at(text: str, line: int, character: int) -> str | None:
     for match in WORD_RE.finditer(source_line):
         if match.start() <= character <= match.end():
             return match.group(0)
+    return None
+
+
+def token_part_index_at(text: str, line: int, character: int) -> int | None:
+    lines = text.splitlines()
+    if line < 0 or line >= len(lines):
+        return None
+    source_line = lines[line]
+    for match in WORD_RE.finditer(source_line):
+        if match.start() <= character <= match.end():
+            prefix = source_line[match.start() : character + 1]
+            return prefix.count(".")
     return None
 
 

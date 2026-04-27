@@ -1,6 +1,6 @@
-# v1.0 Readiness Migration Notes
+# v1.0 Readiness Notes
 
-This document tracks the remaining compatibility work between v0.13 and v1.0.
+This document tracks the compatibility work that moved the v0.13 release-candidate surface into the SL v1.0 local stable baseline.
 
 ## Must Be Stable Before v1.0
 

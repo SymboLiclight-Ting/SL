@@ -1,6 +1,6 @@
-# SL VS Code Preview
+# SL VS Code Support
 
-This folder contains the v0.5 developer-preview VS Code support for `.sl` files.
+This folder contains the local VS Code support for `.sl` files.
 
 ## Local Install
 

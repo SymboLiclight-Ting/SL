@@ -2,11 +2,11 @@
 
 Current focus:
 
-- release-candidate hardening,
-- syntax and API freeze candidate review,
-- migration and compatibility guide drafting,
+- v1.0 local release hardening,
+- syntax and API stable-surface review,
+- migration and compatibility policy maintenance,
 - stricter docs and example consistency checks,
-- final v1.0 blocker classification.
+- local release artifact rehearsal.
 
 Near-term candidates:
 
@@ -17,4 +17,4 @@ Near-term candidates:
 
 Long-term goal:
 
-- reach a stable `v1.0` with frozen core syntax, clear compatibility policy, reliable tooling, and real application case studies.
+- keep SL stable with frozen core syntax, clear compatibility policy, reliable tooling, and real application case studies.

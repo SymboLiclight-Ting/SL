@@ -1,8 +1,8 @@
-# SL v0.13 Freeze Candidate
+# SL v1.0 Stable Surface
 
-v0.13 is the release-candidate hardening phase for the v1.0 public surface. It does not freeze the project forever, but it identifies the surfaces that should not change without a compatibility note, migration note, and regression fixture.
+SL v1.0 promotes the v0.13 release-candidate surface to the stable local release baseline. This does not freeze the project forever, but changes to these surfaces require a compatibility note, migration note, and regression fixture.
 
-## Freeze Candidate Surfaces
+## Stable Surfaces
 
 - top-level items: `app`, `module`, `import`, `intent`, `permissions`, `test from intent.acceptance`, `enum`, `type`, `store`, `config`, `fixture`, `fn`, `command`, `route`, and `test`.
 - type syntax: primitive types, record types, enum references, `Id<T>`, `List<T>`, `Option<T>`, `Result<T, E>`, `Response<T>`, and imported qualified type names.
@@ -17,12 +17,13 @@ v0.13 is the release-candidate hardening phase for the v1.0 public surface. It d
 
 ## Change Policy
 
-- v0.13 must not add new `.sl` syntax.
+- v1.0 maintenance must not add new `.sl` syntax without a new minor-version plan.
 - Any compatibility-affecting fix must update `docs/compatibility.md`, `CHANGELOG.md`, and at least one regression fixture.
 - Public JSON field names must remain stable unless the release notes include a migration path.
 - Generated Python may change internally, but user-visible HTTP error shape, CLI exit codes, and source backreference behavior should remain stable.
+- Generated Python helper names and private implementation layout are not a public API unless documented in `docs/semantics.md`.
 
-## Deferred From Freeze
+## Deferred Beyond v1.0
 
 - automatic migration execution,
 - package registry and version solver,

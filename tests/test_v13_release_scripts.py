@@ -20,7 +20,7 @@ def test_freeze_check_passes() -> None:
     completed = run_script("freeze_check.py")
 
     assert completed.returncode == 0, completed.stderr
-    assert "freeze candidate check passed" in completed.stdout
+    assert "stable surface check passed" in completed.stdout
 
 
 def test_example_matrix_passes() -> None:

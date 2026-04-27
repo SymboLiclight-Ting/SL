@@ -20,4 +20,4 @@ Start with:
 - [AI-assisted Development](ai-assisted-development.md)
 - [Roadmap](roadmap.md)
 
-v0.13 is the current release-candidate hardening phase. The freeze candidate surfaces are tracked in [../freeze-candidate.md](../freeze-candidate.md).
+v1.0 is the current local stable baseline. The stable surfaces are tracked in [../freeze-candidate.md](../freeze-candidate.md).
