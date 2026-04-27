@@ -282,7 +282,7 @@ app HttpBody {
         env={**os.environ, "SL_DB": str(db_path)},
     )
     try:
-        wait_for_server(port)
+        wait_for_server(port, server)
         request = urllib.request.Request(
             f"http://127.0.0.1:{port}/todos",
             data=b'{"title": "Buy milk"}',
@@ -384,7 +384,7 @@ app RuntimeHttpError {
         text=True,
     )
     try:
-        wait_for_server(port)
+        wait_for_server(port, server)
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/boom", timeout=5)
             raise AssertionError("expected runtime exception to fail")
@@ -435,7 +435,7 @@ app HeaderAuth {
         env={**os.environ, "ADMIN_TOKEN": "secret"},
     )
     try:
-        wait_for_server(port)
+        wait_for_server(port, server)
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/secure", timeout=5)
             raise AssertionError("expected missing auth to fail")
@@ -755,7 +755,7 @@ app ResponseHelpers {
         text=True,
     )
     try:
-        wait_for_server(port)
+        wait_for_server(port, proc)
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/ok", timeout=5) as response:
             assert response.status == 201
             assert json.loads(response.read().decode("utf-8")) == {"ok": {"title": "created"}}
@@ -828,14 +828,24 @@ def free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def wait_for_server(port: int) -> None:
-    deadline = time.time() + 5
+def wait_for_server(port: int, process: subprocess.Popen | None = None) -> None:
+    deadline = time.time() + 15
+    last_error: OSError | None = None
     while time.time() < deadline:
+        if process is not None and process.poll() is not None:
+            stdout = process.stdout.read() if process.stdout is not None else ""
+            stderr = process.stderr.read() if process.stderr is not None else ""
+            raise AssertionError(
+                "server exited before accepting connections"
+                f"\nexit code: {process.returncode}"
+                f"\nstdout:\n{stdout}"
+                f"\nstderr:\n{stderr}"
+            )
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}/missing", timeout=0.2):
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
                 return
-        except urllib.error.HTTPError:
-            return
-        except OSError:
+        except OSError as exc:
+            last_error = exc
             time.sleep(0.05)
-    raise AssertionError("server did not start")
+    detail = f": {last_error}" if last_error is not None else ""
+    raise AssertionError(f"server did not start{detail}")
