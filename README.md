@@ -1,5 +1,7 @@
 # SymbolicLight
 
+[中文文档](README.zh-CN.md)
+
 SymbolicLight Language, or SL, is a spec-native, AI-friendly application language for building typed CLI and backend apps with less glue code.
 
 It is designed for developers who want application code that is easy for humans and AI tools to generate, review, test, and maintain. SL v1.0 focuses on explicit models, stores, routes, commands, tests, and task-spec alignment.
